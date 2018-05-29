@@ -214,7 +214,7 @@ int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size) {
             if (!tok_start)
                 return(0);
             tok_start += strlen(CLIENT_PORT_STR);
-            req->client_port = (PORT)atoi(tok_start);
+            req->client_port = (unsigned short)atoi(tok_start);
             if (req->client_port == 0)
                 return(0);
         }
@@ -431,7 +431,9 @@ int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size) {
 
     return(1);
 }
-int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size) {
+
+int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
+{
     int ret;
     int written;
     const char *status_str;
@@ -512,13 +514,16 @@ int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size) {
     return(written);
 }
 
-int check_uri(char *uri) {
+int check_uri(char *uri)
+{
     if (strstr(uri, RTSP_URI) == uri)
         return(1);
+
     return(0);
 }
 
-int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size) {
+int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size)
+{
     int i;
     int attr = -1;
     int attr_len;
@@ -575,7 +580,7 @@ int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size) {
             if (!tok_start)
                 return(0);
             tok_start += strlen(CLIENT_PORT_STR);
-            res->client_port = (PORT)atoi(tok_start);
+            res->client_port = (unsigned short)atoi(tok_start);
             if (res->client_port == 0)
                 return(0);
         }
@@ -585,13 +590,15 @@ int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size) {
             if (!tok_start)
                 return(0);
             tok_start += strlen(SERVER_PORT_STR);
-            res->server_port = (PORT)atoi(tok_start);
+            res->server_port = (unsigned short)atoi(tok_start);
             if (res->server_port == 0)
                 return(0);
         }
         break;
+
     default:
         return(1);
     }
+
     return(1);
 }

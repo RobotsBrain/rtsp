@@ -5,21 +5,25 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 
 THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
+
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
+
 #include "parse_sdp.h"
 
 
-const char * MEDIA_TYPE_STR[] = {"audio\0", "video\0"};
+const char* MEDIA_TYPE_STR[] = {"audio\0", "video\0"};
 
 /*
  * return: Size of sdp_text. 0 is error
  */
-int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size) {
+int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size)
+{
     int ret;
     int i;
     int written = 0;
+
     /* Save space for the last \0 */
     --sdp_max_size;
     sdp_text[sdp_max_size] = 0;
@@ -46,17 +50,19 @@ int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size) {
             return(0);
         written += ret;
         sdp_max_size -= ret;
-
-
     }
+
     sdp_text[written] = 0;
+
     return(written);
 }
 
-int unpack_sdp2(SDP **sdp, unsigned char *sdp_text, int sdp_size) {
+int unpack_sdp2(SDP **sdp, unsigned char *sdp_text, int sdp_size)
+{
     *sdp = (SDP*)malloc(sizeof(SDP));
-    if (!(*sdp))
+    if (!(*sdp)) {
         return(0);
+    }
 
     return unpack_sdp(*sdp, sdp_text, sdp_size);
 }
@@ -64,7 +70,8 @@ int unpack_sdp2(SDP **sdp, unsigned char *sdp_text, int sdp_size) {
 /*
  * return: 1 ok 0 err
  */
-int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size) {
+int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
+{
     unsigned char *media;
     unsigned char *control;
     int tok_len;
@@ -150,23 +157,29 @@ int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size) {
             sdp->medias = 0;
             return(0);
         }
-
     }
-    return(1);
 
+    return(1);
 }
 
-void free_sdp(SDP **sdp) {
-    int i;
+void free_sdp(SDP **sdp)
+{
+    int i = 0;
 
-    if ((*sdp)->uri)
+    if ((*sdp)->uri) {
         free((*sdp)->uri);
+    }
 
-    for (i=0; i < (*sdp)->n_medias; ++i)
-        if ((*sdp)->medias[i]->uri)
+    for (i=0; i < (*sdp)->n_medias; ++i) {
+        if ((*sdp)->medias[i]->uri) {
             free((*sdp)->medias[i]->uri);
+        }
+    }
 
     free((*sdp)->medias);
     free(*sdp);
     *sdp = 0;
+
+    return;
 }
+

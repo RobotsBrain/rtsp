@@ -7,7 +7,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 */
 #ifndef _PARSE_RTSP_H_
 #define _PARSE_RTSP_H_
-#include "common.h"
+// #include "common.h"
 
 typedef enum {UNICAST = 0, MULTICAST} TRANSPORT_CAST;
 
@@ -22,7 +22,7 @@ typedef struct {
     int CSeq;
     int Session;
     TRANSPORT_CAST cast;
-    PORT client_port;
+    unsigned short client_port;
 } RTSP_REQUEST;
 
 typedef struct {
@@ -30,8 +30,8 @@ typedef struct {
     int CSeq;
     int Session;
     TRANSPORT_CAST cast;
-    PORT client_port;
-    PORT server_port;
+    unsigned short client_port;
+    unsigned short server_port;
     int Content_Length;
     char *content;
     int options;

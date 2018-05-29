@@ -8,7 +8,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #ifndef _PARSE_RTP_
 #define _PARSE_RTP_
 
-#include "common.h"
+// #include "common.h"
 
 typedef struct {
     unsigned short seq;

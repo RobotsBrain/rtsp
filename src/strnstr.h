@@ -9,5 +9,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define _STRNSTR_H_
 
 #include <stdlib.h>
+
 char *strnstr(const char *s1, const char *s2, size_t n);
+
 #endif

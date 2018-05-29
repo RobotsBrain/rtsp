@@ -8,16 +8,19 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #ifndef _PARSE_SDP_H
 #define _PARSE_SDP_H
 
-#include "common.h"
+// #include "common.h"
 
 #define N_MEDIA_TYPE 2
 
 /* No dar valores especificos a los MEDIA_TYPE */
-typedef enum {AUDIO = 0, VIDEO} MEDIA_TYPE;
+typedef enum {
+	AUDIO = 0,
+	VIDEO
+} MEDIA_TYPE;
 
 typedef struct {
     MEDIA_TYPE type;
-    PORT port;
+    unsigned short port;
     unsigned char *uri;
 } MEDIA;
 

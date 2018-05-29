@@ -7,6 +7,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 */
 #ifndef _RTSP_H_
 #define _RTSP_H_
+
 #include "parse_rtsp.h"
 #include "parse_sdp.h"
 
@@ -22,7 +23,8 @@ RTSP_REQUEST *rtsp_describe(const unsigned char *uri);
  * cast: UNICAST (TODO: or MULTICAST)
  * client_port: the port where RTP is listening in the client
  */
-RTSP_REQUEST *rtsp_setup(const unsigned char *uri, int Session, TRANSPORT_CAST cast, PORT client_port);
+RTSP_REQUEST *rtsp_setup(const unsigned char *uri, int Session, TRANSPORT_CAST cast,
+						unsigned short client_port);
 
 /* Generate request to play a media. Setup must have been called before for this uri
  * uri: Uri of the media
@@ -64,7 +66,8 @@ RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req);
  * cast: UNICAST (TODO: or MULTICAST)
  * Session: Session id
  */
-RTSP_RESPONSE *rtsp_setup_res(RTSP_REQUEST *req, PORT server_port, PORT client_port, TRANSPORT_CAST cast, int Session);
+RTSP_RESPONSE *rtsp_setup_res(RTSP_REQUEST *req, unsigned short server_port,
+								unsigned short client_port, TRANSPORT_CAST cast, int Session);
 
 /* Generate play response for the request
  * req: Request

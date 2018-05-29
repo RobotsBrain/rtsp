@@ -13,24 +13,19 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <unistd.h>
 #include <stdio.h>
 #include <netdb.h>
+#include <pthread.h>
 
-#include "common.h"
-#include "server.h"
-#include "server_client.h"
+#include "network.h"
+// #include "server_client.h"
 #include "rtsp_server.h"
 #include "internal_rtsp.h"
 #include "hashtable.h"
-#include "hashfunction.h"
 #include "rtsp.h"
 #include "parse_rtsp.h"
 #include "servers_comm.h"
-// #include "strnstr.h"
+
 
 #define REQ_BUFFER 4096
-
-#include <unistd.h>
-#include <pthread.h>
-
 #define MAX_RTSP_WORKERS 20 /* Number of processes listening for rtsp connections */
 #define MAX_IDLE_TIME 60 /* Number of seconds a worker can be idle before is killed */
 
@@ -199,7 +194,7 @@ int initialize_rtsp_globals()
     return(1);
 }
 
-int rtsp_server(PORT port, PORT rtp_port)
+int rtsp_server(unsigned short port, unsigned short rtp_port)
 {
     int st;
 

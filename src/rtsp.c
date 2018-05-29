@@ -14,7 +14,9 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 /* CSeq global variable for auto incrementing it inside the module */
 int CSeq = 0;
 
-RTSP_REQUEST *construct_rtsp_request(METHOD method, const unsigned char *uri, int Session, TRANSPORT_CAST cast, PORT client_port) {
+RTSP_REQUEST *construct_rtsp_request(METHOD method, const unsigned char *uri, int Session,
+                                    TRANSPORT_CAST cast, unsigned short client_port)
+{
     RTSP_REQUEST *req = 0;
     int uri_len = strlen((char *)uri);
     req = malloc(sizeof(RTSP_REQUEST));
@@ -40,27 +42,35 @@ RTSP_REQUEST *construct_rtsp_request(METHOD method, const unsigned char *uri, in
     return req;
 }
 
-RTSP_REQUEST *rtsp_describe(const unsigned char *uri) {
+RTSP_REQUEST *rtsp_describe(const unsigned char *uri)
+{
     return construct_rtsp_request(DESCRIBE, uri, -1, UNICAST, 0);
 }
 
-RTSP_REQUEST *rtsp_setup(const unsigned char *uri, int Session, TRANSPORT_CAST cast, PORT client_port) {
+RTSP_REQUEST *rtsp_setup(const unsigned char *uri, int Session,
+                        TRANSPORT_CAST cast, unsigned short client_port)
+{
     return construct_rtsp_request(SETUP, uri, Session, cast, client_port);
 }
 
-RTSP_REQUEST *rtsp_play(const unsigned char *uri, int Session) {
+RTSP_REQUEST *rtsp_play(const unsigned char *uri, int Session)
+{
     return construct_rtsp_request(PLAY, uri, Session, UNICAST, 0);
 }
 
-RTSP_REQUEST *rtsp_pause(const unsigned char *uri, int Session) {
+RTSP_REQUEST *rtsp_pause(const unsigned char *uri, int Session)
+{
     return construct_rtsp_request(PAUSE, uri, Session, UNICAST, 0);
 }
 
-RTSP_REQUEST *rtsp_teardown(const unsigned char *uri, int Session) {
+RTSP_REQUEST *rtsp_teardown(const unsigned char *uri, int Session)
+{
     return construct_rtsp_request(TEARDOWN, uri, Session, UNICAST, 0);
 }
 
-RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cast, PORT server_port, PORT client_port, int Content_Length, char *content, int options, const RTSP_REQUEST *req) {
+RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cast, unsigned short server_port, unsigned short client_port,
+                                        int Content_Length, char *content, int options, const RTSP_REQUEST *req)
+{
     RTSP_RESPONSE *res = 0;
 
     res = malloc(sizeof(RTSP_RESPONSE));
@@ -90,17 +100,18 @@ RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cas
     return(res);
 }
 
-
-
-RTSP_RESPONSE *rtsp_notfound(RTSP_REQUEST *req) {
+RTSP_RESPONSE *rtsp_notfound(RTSP_REQUEST *req)
+{
     return construct_rtsp_response(404, 0, 0, 0, 0, 0, 0, 0, req);
 }
 
-RTSP_RESPONSE *rtsp_servererror(RTSP_REQUEST *req) {
+RTSP_RESPONSE *rtsp_servererror(RTSP_REQUEST *req)
+{
     return construct_rtsp_response(501, 0, 0, 0, 0, 0, 0, 0, req);
 }
 
-RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req) {
+RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req)
+{
     SDP sdp;
     int uri_len = strlen(req->uri);
     char sdp_str[1024];
@@ -147,41 +158,51 @@ RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req) {
     free(sdp.medias[0]->uri);
     free(sdp.medias[1]->uri);
     free(sdp.medias);
-    return(ret);
 
+    return(ret);
 }
 
 /* server_port and server_port + 1 must be used for this uri/session */
-RTSP_RESPONSE *rtsp_setup_res(RTSP_REQUEST *req, PORT server_port, PORT client_port, TRANSPORT_CAST cast, int Session) {
-    if (cast == MULTICAST)
+RTSP_RESPONSE *rtsp_setup_res(RTSP_REQUEST *req, unsigned short server_port,
+                                unsigned short client_port, TRANSPORT_CAST cast, int Session)
+{
+    if (cast == MULTICAST) {
         return construct_rtsp_response(200, Session, cast, server_port, client_port, 0, 0, 0, req);
-    else
+    } else {
         return construct_rtsp_response(200, Session, cast, server_port, 0, 0, 0, 0, req);
+    }
 }
 
-RTSP_RESPONSE *rtsp_play_res(RTSP_REQUEST *req) {
+RTSP_RESPONSE *rtsp_play_res(RTSP_REQUEST *req)
+{
     return construct_rtsp_response(200, 0, 0, 0, 0, 0, 0, 0, req);
 }
 
-RTSP_RESPONSE *rtsp_pause_res(RTSP_REQUEST *req) {
+RTSP_RESPONSE *rtsp_pause_res(RTSP_REQUEST *req)
+{
     return construct_rtsp_response(200, 0, 0, 0, 0, 0, 0, 0, req);
 }
 
-RTSP_RESPONSE *rtsp_teardown_res(RTSP_REQUEST *req) {
+RTSP_RESPONSE *rtsp_teardown_res(RTSP_REQUEST *req)
+{
     return construct_rtsp_response(200, 0, 0, 0, 0, 0, 0, 0, req);
 }
 
-RTSP_RESPONSE *rtsp_options_res(RTSP_REQUEST *req) {
+RTSP_RESPONSE *rtsp_options_res(RTSP_REQUEST *req)
+{
     return construct_rtsp_response(200, 0, 0, 0, 0, 0, 0, 1, req);
 }
 
-void free_rtsp_req(RTSP_REQUEST **req) {
+void free_rtsp_req(RTSP_REQUEST **req)
+{
     if ((*req)->uri)
         free((*req)->uri);
     free(*req);
     *req = 0;
 }
-void free_rtsp_res(RTSP_RESPONSE **res) {
+
+void free_rtsp_res(RTSP_RESPONSE **res)
+{
     if((*res)->content)
         free((*res)->content);
     free(*res);

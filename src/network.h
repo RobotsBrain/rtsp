@@ -6,8 +6,20 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 
 THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
-#ifndef _SERVER_CLIENT_H_
-#define _SERVER_CLIENT_H_
+#ifndef _SOCKETLIB_H_
+#define _SOCKETLIB_H_
+
+#include <netinet/in.h>
+
+int TCP_connect(const char *address, unsigned short port);
+
+void TCP_disconnect(int sockfd);
+
+int UDP_open_socket();
+
+int UDP_get_destination(const char *ip, unsigned short port, struct sockaddr_in *dest);
+
+void UDP_disconnect(int sockfd);
 
 #define MAX_UDP_BIND_ATTEMPTS 100
 #define RTP_BUFFER_SIZE 512
@@ -38,5 +50,22 @@ int bind_UDP_ports(int *rtp_sockfd, int *rtcp_sockfd);
  * NOTE: It will sleep seconds + nanoseconds.
  */
 void time_sleep(int seconds, int nanoseconds);
+
+
+/* Prototype for the function that creates workers
+ * 1st parameter: Int where the socket will be passed
+ * 2nd parameter: Structure with information of the client
+ */
+typedef int (*WORKER_CREATOR)(int, struct sockaddr_storage*);
+
+/* Server loop that accepts requests y creates workers
+ * port: Port where the server is listening
+ * sockfd: Variable to save the socket
+ * my_addr: Variable to save the server address
+ * create_worker: Function that creates the new worker
+ * return: 0 if error
+ */
+int accept_tcp_requests(unsigned short port, int *sockfd, unsigned int *my_addr,
+						WORKER_CREATOR create_worker);
 
 #endif

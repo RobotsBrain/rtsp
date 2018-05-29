@@ -8,32 +8,41 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 /* hashtable.h: Open addressing hashtable interface */
 #ifndef HASHTABLE_
 #define HASHTABLE_
-typedef enum { OK, ERR, MINSIZE } Hashstatus;
+
+typedef enum {
+	OK,
+	ERR,
+	MINSIZE
+} Hashstatus;
+
 typedef struct _cell cell;
 typedef struct _hashtable hashtable;
 
 typedef unsigned long (*hashfunc) (void *);
 typedef int (*cmpfunc) (void *, void *);
 
-/*@null@*/
-hashtable*
-newhashtable (hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelements);
+unsigned long stringhash(unsigned char *str);
 
-void
-freehashtable (hashtable **ht);
+int stringequal(void *a, void *b);
 
-void
-clearhashtable (hashtable **ht);
+unsigned long longhash(void *n);
 
-Hashstatus
-puthashtable (hashtable **ht, void *key, void *value);
-
+int longequal(void *a, void *b);
 
 /*@null@*/
-void *
-gethashtable (hashtable **ht, void *key);
+hashtable* newhashtable (hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelements);
+
+void freehashtable (hashtable **ht);
+
+void clearhashtable (hashtable **ht);
+
+Hashstatus puthashtable (hashtable **ht, void *key, void *value);
+
 
 /*@null@*/
-Hashstatus
-delhashtable (hashtable **ht, void *key);
+void* gethashtable (hashtable **ht, void *key);
+
+/*@null@*/
+Hashstatus delhashtable (hashtable **ht, void *key);
+
 #endif /*HASHTABLE_*/

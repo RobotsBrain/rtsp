@@ -8,17 +8,100 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 */
 
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <sys/time.h>
-#include <unistd.h>
 #include <stdlib.h>
-#include <netdb.h>
 #include <string.h>
-#include <stdio.h>
 #include <pthread.h>
 #include <errno.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <signal.h>
 
-#include "common.h"
-#include "server_client.h"
+#include "network.h"
+
+
+
+int TCP_connect(const char *address, unsigned short port)
+{
+    int i = 0;
+    int sockfd = -1;
+    struct sockaddr_in addr;
+    struct hostent *host;
+    struct protoent *TCP = getprotobyname("TCP");
+
+    /* Configuramos las partes conocidas de la dirección */
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    bzero(addr.sin_zero, 8);
+
+    /* Obtenemos las IPs del host */
+    host = gethostbyname(address);
+    if (host == 0 || host->h_addrtype != addr.sin_family)
+        return -1;
+
+    /* Se intenta conectar a todas las IPs obtenidas */
+    for (i = 0; (host->h_addr_list)[i]; ++i) {
+
+        sockfd = socket(host->h_addrtype, SOCK_STREAM, TCP->p_proto);
+        //sockfd = socket(host->h_addrtype, SOCK_STREAM, 0);
+        if (sockfd == -1)
+            continue;
+
+        /* Copiamos la direccion al struct sockaddr_in */
+        memcpy(&(addr.sin_addr), host->h_addr_list[i], host->h_length);
+
+        /* Conectamos con el host destino */
+        if (connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+            close(sockfd);
+            continue;
+        }
+
+        return sockfd;
+    }
+
+    /* Se devuelve error en caso de no poder establecer conexión */
+    return -1;
+}
+
+void TCP_disconnect(int sockfd)
+{
+    close(sockfd);
+}
+
+int UDP_open_socket()
+{
+    struct protoent *udp_proto = getprotobyname("UDP");
+
+    return socket(AF_INET, SOCK_DGRAM, udp_proto->p_proto);
+}
+
+int UDP_get_destination(const char *ip, unsigned short port,
+                        struct sockaddr_in *dest)
+{
+    struct hostent *host;
+
+    host = gethostbyname(ip);
+    if (!host)
+        return -1;
+    if (host->h_addrtype != AF_INET)
+        return -1;
+    if (host->h_addr_list[0] == 0)
+        return -1;
+
+    dest->sin_family = AF_INET;
+    dest->sin_port = htons(port);
+    memcpy(&(dest->sin_addr), host->h_addr_list[0], host->h_length);
+    bzero(dest->sin_zero, 8);
+
+    return 0;
+}
+
+void UDP_disconnect(int sockfd)
+{
+    close(sockfd);
+}
 
 /* Receive a message with a final empty line and possibly content
  * returns: 0 on bad message, -1 on closed socket, message length if ok */
@@ -228,5 +311,60 @@ void time_sleep(int sec, int usec)
     t.tv_nsec = usec * 1000;
 
     nanosleep(&t, &tr);
+
+    return;
 }
 
+#define MAX_QUEUE_SIZE 20
+
+int accept_tcp_requests(unsigned short port, int *sockfd, unsigned int *my_addr,
+                        WORKER_CREATOR create_worker)
+{
+    int st;
+    struct addrinfo hints, *res;
+    char port_str[6];
+    int tmp_sockfd;
+    struct sockaddr_storage client_addr;
+    unsigned int client_addr_len = sizeof(client_addr);
+
+    /* Listen incoming connections */
+    /* Code taken from http://beej.us/guide/bgnet */
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+
+    if (!snprintf(port_str, 5, "%d", port))
+        return(0);
+    if (getaddrinfo(0, port_str, &hints, &res))
+        return(0);
+
+    *sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (*sockfd == -1)
+        return(0);
+
+    st = bind(*sockfd, res->ai_addr, res->ai_addrlen);
+    /* Copy server address to my_addr */
+    *my_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
+    freeaddrinfo(res);
+    if (st == -1) {
+        *sockfd = -1;
+        return(0);
+    }
+
+    st = listen(*sockfd, MAX_QUEUE_SIZE);
+    if (st == -1)
+        return(0);
+
+    /* Server loop */
+    for (;;) {
+        /* Accept */
+        tmp_sockfd = accept(*sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (tmp_sockfd == -1)
+            return(0);
+        /* Create worker */
+        st = create_worker(tmp_sockfd, &client_addr);
+        if (!st)
+            close(tmp_sockfd);
+    }
+}
