@@ -36,13 +36,99 @@ const char *NOTFOUND_STR = "Not found\0";
 const char *NULL_STR = "\0";
 
 
-int check_uri(char *uri)
+static int check_uri(char *uri)
 {
     if (strstr(uri, RTSP_URI) == uri) {
         return 1;
     }
 
     return 0;
+}
+
+static int detect_method(char *tok_start, int text_size)
+{
+    int i;
+    int method_len;
+
+    method_len = strcspn(tok_start, " ");
+    if (method_len == text_size || method_len == 0) {
+        return -1;
+    }
+
+    /* Discover attribute */
+    for (i = 0; i < N_METHODS; ++i) {
+        if (!memcmp(METHOD_STR[i], tok_start, method_len)) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
+{
+    int i;
+    int attr = -1;
+    int attr_len;
+    attr_len = strcspn(tok_start, ":");
+    if (attr_len == text_size || attr_len == 0)
+        return(0);
+    /* Discover attribute */
+    for (i = 0; i < N_ATTR; ++i) {
+        if (!memcmp(ATTR_STR[i], tok_start, attr_len)) {
+            attr = i;
+            break;
+        }
+    }
+    tok_start += attr_len;
+    text_size -= attr_len - 1;
+    /* Ignore spaces after ':' */
+    while (*(++tok_start) == ' ')
+        --text_size;
+
+    attr_len = strcspn(tok_start, "\r\n");
+    if (attr_len == text_size || attr_len == 0)
+        return(0);
+
+    switch (attr) {
+    case ACCEPT_STR:
+        /* Only can send SDP */
+        if (!strnstr(tok_start, SDP_STR, attr_len))
+            return(0);
+        break;
+    case CSEQ_STR:
+        req->CSeq = atoi(tok_start);
+        break;
+    case SESSION_STR:
+        req->Session = atoi(tok_start);
+        break;
+    case TRANSPORT_STR:
+        /* The only acceptable transport is RTP */
+        if (!strnstr(tok_start, RTP_STR, attr_len))
+            return(0);
+        /* Check if the transport is unicast or multicast */
+        if (strnstr(tok_start, CAST_STR[UNICAST], attr_len))
+            req->cast = UNICAST;
+        else if (strnstr(tok_start, CAST_STR[MULTICAST], attr_len))
+            req->cast = MULTICAST;
+        else
+            return(0);
+        /* Get the client ports */
+        if ( (tok_start = strnstr(tok_start, CLIENT_PORT_STR, attr_len)) ) {
+            if (!tok_start)
+                return(0);
+            tok_start += strlen(CLIENT_PORT_STR);
+            req->client_port = (unsigned short)atoi(tok_start);
+            if (req->client_port == 0)
+                return(0);
+        }
+        break;
+
+    default:
+        return(1);
+    }
+
+    return 1;
 }
 
 int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
@@ -162,96 +248,6 @@ int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
     return(1);
 }
 
-int detect_method(char *tok_start, int text_size)
-{
-    int i;
-    int method_len;
-    method_len = strcspn(tok_start, " ");
-    if (method_len == text_size || method_len == 0)
-        return(-1);
-    /* Discover attribute */
-    for (i = 0; i < N_METHODS; ++i) {
-        if (!memcmp(METHOD_STR[i], tok_start, method_len)) {
-            return(i);
-        }
-    }
-
-    return(-1);
-}
-
-int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
-{
-    int i;
-    int attr = -1;
-    int attr_len;
-    attr_len = strcspn(tok_start, ":");
-    if (attr_len == text_size || attr_len == 0)
-        return(0);
-    /* Discover attribute */
-    for (i = 0; i < N_ATTR; ++i) {
-        if (!memcmp(ATTR_STR[i], tok_start, attr_len)) {
-            attr = i;
-            break;
-        }
-    }
-    tok_start += attr_len;
-    text_size -= attr_len - 1;
-    /* Ignore spaces after ':' */
-    while (*(++tok_start) == ' ')
-        --text_size;
-
-    attr_len = strcspn(tok_start, "\r\n");
-    if (attr_len == text_size || attr_len == 0)
-        return(0);
-
-    switch (attr) {
-    case ACCEPT_STR:
-        /* Only can send SDP */
-        if (!strnstr(tok_start, SDP_STR, attr_len))
-            return(0);
-        break;
-    case CSEQ_STR:
-        req->CSeq = atoi(tok_start);
-        break;
-    case SESSION_STR:
-        req->Session = atoi(tok_start);
-        break;
-    case TRANSPORT_STR:
-        /* The only acceptable transport is RTP */
-        if (!strnstr(tok_start, RTP_STR, attr_len))
-            return(0);
-        /* Check if the transport is unicast or multicast */
-        if (strnstr(tok_start, CAST_STR[UNICAST], attr_len))
-            req->cast = UNICAST;
-        else if (strnstr(tok_start, CAST_STR[MULTICAST], attr_len))
-            req->cast = MULTICAST;
-        else
-            return(0);
-        /* Get the client ports */
-        if ( (tok_start = strnstr(tok_start, CLIENT_PORT_STR, attr_len)) ) {
-            if (!tok_start)
-                return(0);
-            tok_start += strlen(CLIENT_PORT_STR);
-            req->client_port = (unsigned short)atoi(tok_start);
-            if (req->client_port == 0)
-                return(0);
-        }
-        break;
-
-    default:
-        return(1);
-    }
-
-    return(1);
-}
-
-/*
- * Pack the structure RTSP_REQUEST in a string
- * req: request structure
- * req_text: String where the request will be packed
- * text_size: Length of req_text
- * return: number of characters written. 0 is error
- */
 int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
 {
     int ret;
@@ -318,6 +314,87 @@ int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
     req_text[written] = 0;
 
     return(written);
+}
+
+static int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size)
+{
+    int i;
+    int attr = -1;
+    int attr_len;
+    attr_len = strcspn(tok_start, ":");
+    if (attr_len == text_size || attr_len == 0)
+        return(0);
+    /* Discover attribute */
+    for (i = 0; i < N_ATTR; ++i) {
+        if (!memcmp(ATTR_STR[i], tok_start, attr_len)) {
+            attr = i;
+            break;
+        }
+    }
+    tok_start += attr_len;
+    text_size -= attr_len - 1;
+    /* Ignore spaces after ':' */
+    while (*(++tok_start) == ' ')
+        --text_size;
+
+    attr_len = strcspn(tok_start, "\r\n");
+    if (attr_len == text_size || attr_len == 0)
+        return(0);
+
+    switch (attr) {
+    case CSEQ_STR:
+        res->CSeq = atoi(tok_start);
+        break;
+    case SESSION_STR:
+        res->Session = atoi(tok_start);
+        break;
+    case CONTENT_TYPE_STR:
+        if (memcmp(tok_start, SDP_STR, attr_len))
+            return(0);
+        break;
+    case CONTENT_LENGTH_STR:
+        res->Content_Length = atoi(tok_start);
+        if (!res->Content_Length)
+            return(0);
+        break;
+    case TRANSPORT_STR:
+        /* The only acceptable transport is RTP */
+        if (!strnstr(tok_start, RTP_STR, attr_len))
+            return(0);
+        /* Check if the transport is unicast or multicast */
+        if (strnstr(tok_start, CAST_STR[UNICAST], attr_len))
+            res->cast = UNICAST;
+        else if (strnstr(tok_start, CAST_STR[MULTICAST], attr_len))
+            res->cast = MULTICAST;
+        else
+            return(0);
+
+        /* Get the client ports */
+        if ( (tok_start = strnstr(tok_start, CLIENT_PORT_STR, attr_len)) ) {
+            if (!tok_start)
+                return(0);
+            tok_start += strlen(CLIENT_PORT_STR);
+            res->client_port = (unsigned short)atoi(tok_start);
+            if (res->client_port == 0)
+                return(0);
+        }
+
+        /* Get the client ports */
+        if ( (tok_start = strnstr(tok_start, SERVER_PORT_STR, attr_len)) ) {
+            if (!tok_start)
+                return(0);
+            tok_start += strlen(SERVER_PORT_STR);
+            res->server_port = (unsigned short)atoi(tok_start);
+            if (res->server_port == 0)
+                return(0);
+        }
+        break;
+
+    default:
+        return(1);
+    }
+
+    return(1);
 }
 
 int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
@@ -537,87 +614,6 @@ int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
     return(written);
 }
 
-int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size)
-{
-    int i;
-    int attr = -1;
-    int attr_len;
-    attr_len = strcspn(tok_start, ":");
-    if (attr_len == text_size || attr_len == 0)
-        return(0);
-    /* Discover attribute */
-    for (i = 0; i < N_ATTR; ++i) {
-        if (!memcmp(ATTR_STR[i], tok_start, attr_len)) {
-            attr = i;
-            break;
-        }
-    }
-    tok_start += attr_len;
-    text_size -= attr_len - 1;
-    /* Ignore spaces after ':' */
-    while (*(++tok_start) == ' ')
-        --text_size;
-
-    attr_len = strcspn(tok_start, "\r\n");
-    if (attr_len == text_size || attr_len == 0)
-        return(0);
-
-    switch (attr) {
-    case CSEQ_STR:
-        res->CSeq = atoi(tok_start);
-        break;
-    case SESSION_STR:
-        res->Session = atoi(tok_start);
-        break;
-    case CONTENT_TYPE_STR:
-        if (memcmp(tok_start, SDP_STR, attr_len))
-            return(0);
-        break;
-    case CONTENT_LENGTH_STR:
-        res->Content_Length = atoi(tok_start);
-        if (!res->Content_Length)
-            return(0);
-        break;
-    case TRANSPORT_STR:
-        /* The only acceptable transport is RTP */
-        if (!strnstr(tok_start, RTP_STR, attr_len))
-            return(0);
-        /* Check if the transport is unicast or multicast */
-        if (strnstr(tok_start, CAST_STR[UNICAST], attr_len))
-            res->cast = UNICAST;
-        else if (strnstr(tok_start, CAST_STR[MULTICAST], attr_len))
-            res->cast = MULTICAST;
-        else
-            return(0);
-
-        /* Get the client ports */
-        if ( (tok_start = strnstr(tok_start, CLIENT_PORT_STR, attr_len)) ) {
-            if (!tok_start)
-                return(0);
-            tok_start += strlen(CLIENT_PORT_STR);
-            res->client_port = (unsigned short)atoi(tok_start);
-            if (res->client_port == 0)
-                return(0);
-        }
-
-        /* Get the client ports */
-        if ( (tok_start = strnstr(tok_start, SERVER_PORT_STR, attr_len)) ) {
-            if (!tok_start)
-                return(0);
-            tok_start += strlen(SERVER_PORT_STR);
-            res->server_port = (unsigned short)atoi(tok_start);
-            if (res->server_port == 0)
-                return(0);
-        }
-        break;
-
-    default:
-        return(1);
-    }
-
-    return(1);
-}
-
 /* CSeq global variable for auto incrementing it inside the module */
 int CSeq = 0;
 
@@ -820,3 +816,4 @@ void free_rtsp_res(RTSP_RESPONSE **res)
 
     return;
 }
+

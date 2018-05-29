@@ -57,24 +57,11 @@ typedef struct {
 
 int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size);
 
-int detect_method(char *tok_start, int text_size);
-
-int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size);
-
-/*
- * Pack the structure RTSP_REQUEST in a string
- * req: request structure
- * req_text: String where the request will be packed
- * text_size: Length of req_text
- * return: number of characters written. 0 is error
- */
 int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size);
 
 int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
 
 int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
-
-int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size);
 
 
 /* Generate request to get description of a media in sdp format
