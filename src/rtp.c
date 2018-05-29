@@ -12,67 +12,86 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include "rtp.h"
 
 #define RTP_MIN_SIZE 12
-const unsigned char start_pkg[] = {128, 0};
 
-
+// https://www.cnblogs.com/qingquan/archive/2011/07/28/2120440.html
+/********************************************************************
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|V=2|P|X|  CC   |M|     PT      |       sequence number         |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                           timestamp                           |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|           synchronization source (SSRC) identifier            |
++=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+|            contributing source (CSRC) identifiers             |
+|                             ....                              |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+********************************************************************/
 
 int pack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size)
 {
-    unsigned short num_s;
-    unsigned long num_l;
-    if (pkg_max_size < RTP_MIN_SIZE || pkg->d_size > pkg_max_size - RTP_MIN_SIZE)
-        return(0);
+    unsigned short num_s = 0;
+    unsigned long num_l = 0;
+    unsigned char start_pkg[] = {128, 0};
 
-    /* Set header */
+    if (pkg_max_size < RTP_MIN_SIZE
+        || pkg->d_size > pkg_max_size - RTP_MIN_SIZE) {
+        return 0;
+    }
+
     memcpy(packet, start_pkg, 2);
+
     packet += 2;
     num_s = htons(pkg->header->seq);
     memcpy(packet, &num_s, 2);
+
     packet += 2;
     num_l = htonl(pkg->header->timestamp);
     memcpy(packet, &num_l, 4);
+
     packet += 4;
     num_l = htonl(pkg->header->ssrc);
     memcpy(packet, &num_l, 4);
-    packet += 4;
 
-    /* Copy data */
+    packet += 4;
     memcpy(packet, pkg->data, pkg->d_size);
 
-    return(RTP_MIN_SIZE + pkg->d_size);
+    return (RTP_MIN_SIZE + pkg->d_size);
 }
 
-/*
- * return: Size of data. 0 if error
- */
 int unpack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size)
 {
-    unsigned short num_s;
-    unsigned long num_l;
-    if (pkg_max_size < RTP_MIN_SIZE)
-        return(0);
+    unsigned short num_s = 0;
+    unsigned long num_l = 0;
+    unsigned char start_pkg[] = {128, 0};
 
-    /* Check header */
-    if (memcmp(packet, start_pkg, 2))
-        return(0);
+    if (pkg_max_size < RTP_MIN_SIZE) {
+        return 0;
+    }
+
+    if (memcmp(packet, start_pkg, 2) != 0) {
+        return 0;
+    }
+
     packet += 2;
     memcpy(&num_s, packet, 2);
     pkg->header->seq = ntohs(num_s);
+
     packet += 2;
     memcpy(&num_l, packet, 4);
     pkg->header->timestamp = htonl(num_l);
+
     packet += 4;
     memcpy(&num_l, packet, 4);
     pkg->header->ssrc = ntohl(num_l);
+
     packet += 4;
-
     pkg_max_size -= RTP_MIN_SIZE;
-
     pkg->d_size = pkg_max_size;
     pkg->data = malloc(pkg_max_size);
-
-    /* Copy data */
     memcpy(pkg->data, packet, pkg_max_size);
 
-    return(pkg_max_size);
+    return pkg_max_size;
 }
+

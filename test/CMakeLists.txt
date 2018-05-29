@@ -10,8 +10,8 @@ link_directories(
 
 
 #################################
-add_executable(test_parse_rtp test_parse_rtp.c)
-target_link_libraries(test_parse_rtp rtsp)
+add_executable(test_rtp test_rtp.c)
+target_link_libraries(test_rtp rtsp)
 
 
 #################################
@@ -20,8 +20,8 @@ target_link_libraries(test_parse_rtsp rtsp)
 
 
 #################################
-add_executable(test_parse_sdp test_parse_sdp.c)
-target_link_libraries(test_parse_sdp rtsp)
+add_executable(test_sdp test_sdp.c)
+target_link_libraries(test_sdp rtsp)
 
 
 #################################

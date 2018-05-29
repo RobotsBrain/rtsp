@@ -23,14 +23,9 @@ typedef struct {
 } RTP_PKG;
 
 
-/*
- * return: Size of packet. 0 is error
- */
 int pack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size);
 
-/*
- * return: Size of data. 0 if error
- */
+
 int unpack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size);
 
 #endif

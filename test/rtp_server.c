@@ -895,13 +895,15 @@ gboolean on_pipeline_msg(GstBus * bus, GstMessage * msg, gpointer loop)
   return TRUE;
 }
 
-void *gstreamer_loop_thread_fun(void *arg) {
+void *gstreamer_loop_thread_fun(void *arg)
+{
     close(media_pipe[0]);
     g_main_loop_run(loop);
     kill(getpid(), SIGUSR1);
 }
 
-void *gstreamer_comm_thread_fun(void *ssrc) {
+void *gstreamer_comm_thread_fun(void *ssrc)
+{
     char rtp_buffer[RTP_BUFFER_SIZE];
     RTP_PKG rtp_package;
     char rtp_packet[RTP_BUFFER_SIZE + 100];
@@ -986,7 +988,8 @@ void *gstreamer_comm_thread_fun(void *ssrc) {
     }
 }
 
-void *gstreamer_limitrate_thread_fun(void *arg) {
+void *gstreamer_limitrate_thread_fun(void *arg)
+{
     GstFormat fmt = GST_FORMAT_TIME;
     gint64 pos;
     gint64 len;
@@ -1029,12 +1032,14 @@ void *gstreamer_limitrate_thread_fun(void *arg) {
   }
 }
 
-void sleeper_stop(int signal) {
+void sleeper_stop(int signal)
+{
     close(sleeper_pipe[0]);
     exit(0);
 }
 
-void sleeper_fun() {
+void sleeper_fun()
+{
     pid_t sleeper = getppid();
     struct timespec sleep_nano;
     signal(SIGINT, sleeper_stop);
