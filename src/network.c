@@ -329,7 +329,9 @@ int accept_tcp_requests(unsigned short port, int *sockfd, unsigned int *my_addr,
 
     st = bind(*sockfd, res->ai_addr, res->ai_addrlen);
     /* Copy server address to my_addr */
-    *my_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
+    if(my_addr != NULL) {
+        *my_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
+    }
     freeaddrinfo(res);
     if (st == -1) {
         *sockfd = -1;

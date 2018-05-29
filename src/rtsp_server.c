@@ -34,12 +34,7 @@ typedef struct {
     struct sockaddr_storage client_addr;
 } WORKER;
 
-void *rtsp_worker_fun(void *arg);
-void *rtsp_worker_terminator_fun(void *arg);
-
-
 unsigned short rtp_comm_port;  /* Port for communication with rtp servers */
-unsigned int my_addr;  /* My ip */
 /* Workers array where the information of each worker will be saved */
 WORKER workers[MAX_RTSP_WORKERS][1];
 pthread_mutex_t workers_mutex;
@@ -48,9 +43,7 @@ pthread_mutex_t workers_mutex;
 hashtable *session_hash;
 pthread_mutex_t hash_mutex;
 int sockfd;  /* Server socket descriptor */
-pid_t rtp_proc;  /* Pid of RTP process */
 pthread_t worker_terminator;  /* Pthread that checks for idle worker */
-pthread_t rtp_messenger;  /* Pthread that gets petitions from RTP */
 
 /* Free all resources from the server */
 void rtsp_server_stop(int sig)
@@ -81,12 +74,6 @@ void rtsp_server_stop(int sig)
     fprintf(stderr, "- killed\n");
 
     /* Send SIGUSR1 to RTP process and wait process */
-    if (rtp_proc != -1) {
-        fprintf(stderr, "Killing RTP ");
-        // kill(rtp_proc, SIGUSR1);
-        waitpid(rtp_proc, 0, 0);
-        fprintf(stderr, "- killed\n");
-    }
 
     /* Kill thread that checks idle workers */
     fprintf(stderr, "Killing threads ");
@@ -94,9 +81,6 @@ void rtsp_server_stop(int sig)
     pthread_join(worker_terminator, 0);
 
     /* Kill thread that gets petitions from RTP */
-    pthread_cancel(rtp_messenger);
-    pthread_join(rtp_messenger, 0);
-    fprintf(stderr, "- killed\n");
 
     /* Free session hash. Don't use mutexes because at this moment all the
      * other threads that could be accessing it have been killed */
@@ -117,123 +101,6 @@ void rtsp_server_stop(int sig)
     fprintf(stderr, "Finished\n");
 
     exit(0);
-}
-
-void *rtsp_worker_terminator_fun(void *arg)
-{
-    time_t now;
-    int i;
-
-    for (;;) {
-        /* Each second check if any worker has been idle too much time */
-        sleep(1);
-        now = time(0);
-
-        pthread_mutex_lock(&workers_mutex);
-
-        for(i = 0; i < MAX_RTSP_WORKERS; ++i) {
-            if (workers[i]->used) {
-                if (now - workers[i]->time_contacted > MAX_IDLE_TIME) {
-                    workers[i]->used = 0;
-                    pthread_cancel(workers[i]->thread_id);
-                    pthread_join(workers[i]->thread_id, 0);
-                    
-                    close(workers[i]->sockfd); /* Close worker socket */
-                }
-            }
-        }
-
-        pthread_mutex_unlock(&workers_mutex);
-    }
-
-    return NULL;
-}
-
-int rtsp_worker_create(int tmp_sockfd, struct sockaddr_storage *client_addr)
-{
-    int ret = -1;
-    int i;
-    int st;
-
-    pthread_mutex_lock(&workers_mutex);
-
-    do {
-        /* Find an unused worker */
-        for (i = 0; i < MAX_RTSP_WORKERS; ++i) {
-            if (!workers[i]->used) {
-                break;
-            }       
-        }
-
-        if(i >= MAX_RTSP_WORKERS) {
-            break;
-        }
-
-        st = pthread_create(&workers[i]->thread_id, 0, rtsp_worker_fun, &workers[i]);
-        if (st) {
-            break;
-        }
-
-        workers[i]->used = 1;
-        workers[i]->sockfd = tmp_sockfd;  /* Save socket info */
-        workers[i]->time_contacted = time(0);  /* Set as accesed now */
-
-        memcpy(&(workers[i]->client_addr), client_addr, sizeof(struct sockaddr_storage));
-        ret = 0;
-    } while(0);
-
-    pthread_mutex_unlock(&workers_mutex);
-
-    return ret;
-}
-
-int rtsp_server(unsigned short port, unsigned short rtp_port)
-{
-    rtp_comm_port = rtp_port;
-
-    int i;
-    int st;
-
-    srand(time(0));
-
-    session_hash = 0;
-    sockfd = -1;
-    rtp_proc = -1;
-
-    /* Intialize workers array */
-    for (i = 0; i < MAX_RTSP_WORKERS; ++i) {
-        workers[i]->used = 0;
-    }
-
-    /* Initialize hash table */
-    session_hash = newhashtable(longhash, longequal, MAX_RTSP_WORKERS * 2, 1);
-    if (!session_hash) {
-        return(0);
-    }
-
-    /* Initialize hash table mutex */
-    if (pthread_mutex_init(&hash_mutex, 0)) {
-        clearhashtable(&session_hash);
-        freehashtable(&session_hash);
-        return(0);
-    }
-
-    /* Initialize workers mutex */
-    if (pthread_mutex_init(&workers_mutex, 0)) {
-        pthread_mutex_destroy(&hash_mutex);
-        clearhashtable(&session_hash);
-        freehashtable(&session_hash);
-        return(0);
-    }
-
-    /* Create thread that checks idle workers */
-    st = pthread_create(&worker_terminator, 0, rtsp_worker_terminator_fun, 0);
-    if (st) {
-    }
-
-    accept_tcp_requests(port, &sockfd, &my_addr, rtsp_worker_create);
-
-    return 0;
 }
 
 RTSP_RESPONSE *rtsp_server_options(WORKER *self, RTSP_REQUEST *req)
@@ -665,7 +532,7 @@ int send_to_rtp(RTSP_TO_RTP *message)
 int rtp_send_play(char *uri, unsigned int ssrc)
 {
     RTSP_TO_RTP play_msg;
-    RTP_TO_RTSP response;
+
     play_msg.order = PLAY_RTP;
     play_msg.ssrc = ssrc;
     strcpy(play_msg.uri, uri);
@@ -683,6 +550,7 @@ RTSP_RESPONSE *rtsp_server_play(WORKER *self, RTSP_REQUEST *req)
 int rtp_send_pause(char *uri, unsigned int ssrc)
 {
     RTSP_TO_RTP pause_msg;
+
     pause_msg.order = PAUSE_RTP;
     pause_msg.ssrc = ssrc;
     strcpy(pause_msg.uri, uri);
@@ -698,6 +566,7 @@ RTSP_RESPONSE *rtsp_server_pause(WORKER *self, RTSP_REQUEST *req)
 int rtp_send_teardown(char *uri, unsigned int ssrc)
 {
     RTSP_TO_RTP teardown_msg;
+
     teardown_msg.order = TEARDOWN_RTP;
     teardown_msg.ssrc = ssrc;
     strcpy(teardown_msg.uri, uri);
@@ -867,13 +736,8 @@ void *rtsp_worker_fun(void *arg)
                 send(sockfd, buf, strlen(buf), 0);
             }
         } while (server_error || !st);
-
-        /* Correct request */
-        /* Process request */
-
-        /* Get or create session */
-        st = get_session(&(req->Session), &rtsp_info);
-
+        
+        st = get_session(&(req->Session), &rtsp_info);  /* Get or create session */
         /* Check that CSeq is incrementing */
         if (req->CSeq <= CSeq) {
             res = rtsp_servererror(req);
@@ -960,5 +824,121 @@ void *rtsp_worker_fun(void *arg)
     }
 
     return NULL;
+}
+
+void *rtsp_worker_terminator_fun(void *arg)
+{
+    time_t now;
+    int i;
+
+    for (;;) {
+        /* Each second check if any worker has been idle too much time */
+        sleep(1);
+        now = time(0);
+
+        pthread_mutex_lock(&workers_mutex);
+
+        for(i = 0; i < MAX_RTSP_WORKERS; ++i) {
+            if (workers[i]->used) {
+                if (now - workers[i]->time_contacted > MAX_IDLE_TIME) {
+                    workers[i]->used = 0;
+                    pthread_cancel(workers[i]->thread_id);
+                    pthread_join(workers[i]->thread_id, 0);
+                    
+                    close(workers[i]->sockfd); /* Close worker socket */
+                }
+            }
+        }
+
+        pthread_mutex_unlock(&workers_mutex);
+    }
+
+    return NULL;
+}
+
+int rtsp_worker_create(int tmp_sockfd, struct sockaddr_storage *client_addr)
+{
+    int ret = -1;
+    int i;
+    int st;
+
+    pthread_mutex_lock(&workers_mutex);
+
+    do {
+        /* Find an unused worker */
+        for (i = 0; i < MAX_RTSP_WORKERS; ++i) {
+            if (!workers[i]->used) {
+                break;
+            }       
+        }
+
+        if(i >= MAX_RTSP_WORKERS) {
+            break;
+        }
+
+        st = pthread_create(&workers[i]->thread_id, 0, rtsp_worker_fun, &workers[i]);
+        if (st) {
+            break;
+        }
+
+        workers[i]->used = 1;
+        workers[i]->sockfd = tmp_sockfd;  /* Save socket info */
+        workers[i]->time_contacted = time(0);  /* Set as accesed now */
+
+        memcpy(&(workers[i]->client_addr), client_addr, sizeof(struct sockaddr_storage));
+        ret = 0;
+    } while(0);
+
+    pthread_mutex_unlock(&workers_mutex);
+
+    return ret;
+}
+
+int rtsp_server(unsigned short port, unsigned short rtp_port)
+{
+    rtp_comm_port = rtp_port;
+
+    int i;
+    int st;
+
+    srand(time(0));
+
+    session_hash = 0;
+    sockfd = -1;
+
+    /* Intialize workers array */
+    for (i = 0; i < MAX_RTSP_WORKERS; ++i) {
+        workers[i]->used = 0;
+    }
+
+    /* Initialize hash table */
+    session_hash = newhashtable(longhash, longequal, MAX_RTSP_WORKERS * 2, 1);
+    if (!session_hash) {
+        return(0);
+    }
+
+    /* Initialize hash table mutex */
+    if (pthread_mutex_init(&hash_mutex, 0)) {
+        clearhashtable(&session_hash);
+        freehashtable(&session_hash);
+        return(0);
+    }
+
+    /* Initialize workers mutex */
+    if (pthread_mutex_init(&workers_mutex, 0)) {
+        pthread_mutex_destroy(&hash_mutex);
+        clearhashtable(&session_hash);
+        freehashtable(&session_hash);
+        return(0);
+    }
+
+    /* Create thread that checks idle workers */
+    st = pthread_create(&worker_terminator, 0, rtsp_worker_terminator_fun, 0);
+    if (st) {
+    }
+
+    accept_tcp_requests(port, &sockfd, NULL, rtsp_worker_create);
+
+    return 0;
 }
 
