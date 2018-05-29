@@ -70,15 +70,12 @@ int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size);
  */
 int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size);
 
-int unpack_rtsp_res2(RTSP_RESPONSE **res, char *res_text, int text_size);
-
 int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
 
 int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
 
 int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size);
 
-int check_uri(char *uri);
 
 /* Generate request to get description of a media in sdp format
  * uri: Uri of the media

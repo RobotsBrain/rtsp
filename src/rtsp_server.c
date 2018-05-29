@@ -105,15 +105,15 @@ void rtsp_server_stop(int sig)
 
 RTSP_RESPONSE *rtsp_server_options(WORKER *self, RTSP_REQUEST *req)
 {
-    return(rtsp_options_res(req));
+    return rtsp_options_res(req);
 }
 
 RTSP_RESPONSE *rtsp_server_describe(WORKER *self, RTSP_REQUEST *req)
 {
     if (1/* TODO: Check if file exists */) {
-        return(rtsp_describe_res(req));
+        return rtsp_describe_res(req);
     } else {
-        return(rtsp_notfound(req));
+        return rtsp_notfound(req);
     }
 }
 
@@ -207,9 +207,7 @@ int rtp_send_create_unicast_connection(RTP_TO_RTSP *data_from_rtp, char *uri,
 RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
                                 INTERNAL_RTSP *rtsp_info)
 {
-    int i;
-    int j;
-    int st;
+    int i, j, st;
     int global_uri_len;
     char * end_global_uri;
     RTP_TO_RTSP data_from_rtp;
@@ -222,7 +220,7 @@ RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
     }
 
     if (!end_global_uri) {
-        return(rtsp_notfound(req));
+        return rtsp_notfound(req);
     }
 
     global_uri_len = end_global_uri - req->uri;
@@ -234,8 +232,9 @@ RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
             if (!rtsp_info) {
                 fprintf(stderr, "Creating new session\n");
                 rtsp_info = malloc(sizeof(INTERNAL_RTSP));
-                if (!rtsp_info)
+                if (!rtsp_info) {
                     // kill(getpid(), SIGINT);
+                }
 
                 rtsp_info->n_sources = 0;
                 rtsp_info->sources = 0;
@@ -317,10 +316,15 @@ RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
                 /* Put the client udp port in the structure */
                 ((struct sockaddr_in*)&rtsp_info->client_addr)->sin_port = htons(req->client_port);
                 pthread_mutex_unlock(&hash_mutex);
-                st = rtp_send_create_unicast_connection(&data_from_rtp, req->uri, rtsp_info->Session, &(rtsp_info->client_addr));
-                if (!st) {
-                    return(rtsp_servererror(req));
-                }
+#if 0
+                // st = rtp_send_create_unicast_connection(&data_from_rtp, req->uri, rtsp_info->Session, &(rtsp_info->client_addr));
+                // if (!st) {
+                //     return(rtsp_servererror(req));
+                // }
+#else
+                data_from_rtp.ssrc = 2333;
+                data_from_rtp.server_port = 23456;
+#endif
                 pthread_mutex_lock(&hash_mutex);
                 rtsp_info = gethashtable(&session_hash, &(req->Session));
                 /* Check if the session has disappeared for some reason */
@@ -333,20 +337,19 @@ RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
                 rtsp_info->sources[i]->medias[j]->ssrc = data_from_rtp.ssrc; 
             }
 
-
             /* TODO: this */
-            //        return rtsp_setup_res(req, data_to_rtp->server_port, 0, UNICAST, 0);
+            // return rtsp_setup_res(req, data_to_rtp->server_port, 0, UNICAST, 0);
             res = rtsp_setup_res(req, data_from_rtp.server_port, 0, UNICAST, 0);
             pthread_mutex_unlock(&hash_mutex);
             return res;
         } else {
-            return(rtsp_notfound(req));
+            return rtsp_notfound(req);
         }
     } else {
         /* TODO: Multicast */
         /*create_rtsp_unicast_connection(req->uri);*/
         fprintf(stderr, "caca8\n");
-        return(rtsp_servererror(req));
+        return rtsp_servererror(req);
     }
 }
 
@@ -712,7 +715,7 @@ void *rtsp_worker_fun(void *arg)
 
             st = receive_message(sockfd, buf, REQ_BUFFER);
             if (st == -1) {
-                return(0);
+                return 0;
             } else if (!st) {
                 server_error = 1;
             }

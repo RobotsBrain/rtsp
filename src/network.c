@@ -160,7 +160,7 @@ int receive_message(int sockfd, char * buf, int buf_size)
     }
 
     buf[ret] = 0;
-    fprintf(stderr, "\n########## RECEIVED ##########\n%s\n##############################\n", buf);
+    fprintf(stderr, "\n\n########################## RECEIVED ##########################\n%s", buf);
     free(tmp);
 
     return ret;

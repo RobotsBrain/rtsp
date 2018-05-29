@@ -35,7 +35,18 @@ const char *SERVERERROR_STR = "Internal server error\0";
 const char *NOTFOUND_STR = "Not found\0";
 const char *NULL_STR = "\0";
 
-int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size) {
+
+int check_uri(char *uri)
+{
+    if (strstr(uri, RTSP_URI) == uri) {
+        return 1;
+    }
+
+    return 0;
+}
+
+int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
+{
     char *tok_start;
     int tok_len;
     int attr;
@@ -151,7 +162,8 @@ int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size) {
     return(1);
 }
 
-int detect_method(char *tok_start, int text_size) {
+int detect_method(char *tok_start, int text_size)
+{
     int i;
     int method_len;
     method_len = strcspn(tok_start, " ");
@@ -159,13 +171,16 @@ int detect_method(char *tok_start, int text_size) {
         return(-1);
     /* Discover attribute */
     for (i = 0; i < N_METHODS; ++i) {
-        if (!memcmp(METHOD_STR[i], tok_start, method_len))
+        if (!memcmp(METHOD_STR[i], tok_start, method_len)) {
             return(i);
+        }
     }
+
     return(-1);
 }
 
-int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size) {
+int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
+{
     int i;
     int attr = -1;
     int attr_len;
@@ -222,9 +237,11 @@ int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size) {
                 return(0);
         }
         break;
+
     default:
         return(1);
     }
+
     return(1);
 }
 
@@ -235,7 +252,8 @@ int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size) {
  * text_size: Length of req_text
  * return: number of characters written. 0 is error
  */
-int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size) {
+int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
+{
     int ret;
     int written;
 
@@ -298,19 +316,12 @@ int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size) {
     written += ret;
 
     req_text[written] = 0;
+
     return(written);
 }
 
-/* Convenience function, reserves RTSP_RESPONSE */
-int unpack_rtsp_res2(RTSP_RESPONSE **res, char *res_text, int text_size) {
-    *res = (RTSP_RESPONSE *)malloc(sizeof(RTSP_RESPONSE));
-    if (!(*res))
-        return 0;
-
-    return unpack_rtsp_res(*res, res_text, text_size);
-}
-
-int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size) {
+int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
+{
     char *tok_start;
     int tok_len;
     int attr;
@@ -489,9 +500,14 @@ int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
 
     /* Write client and server ports*/
     if (res->client_port && res->server_port) {
-        ret = snprintf(res_text + written, text_size - written, "Transport: RTP/AVP;%s;client_port=%d-%d;server_port=%d-%d\r\n", CAST_STR[res->cast], res->client_port, res->client_port + 1, res->server_port, res->server_port + 1);
-        if (ret < 0 || ret >= text_size - written)
+        ret = snprintf(res_text + written, text_size - written, \
+            "Transport: RTP/AVP;%s;client_port=%d-%d;server_port=%d-%d\r\n", \
+            CAST_STR[res->cast], res->client_port, res->client_port + 1, \
+            res->server_port, res->server_port + 1);
+        if (ret < 0 || ret >= text_size - written) {
             return(0);
+        }
+
         written += ret;
     }
 
@@ -503,26 +519,22 @@ int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
     }
     /* Empty line */
     ret = snprintf(res_text + written, text_size - written, "\r\n");
-    if (ret < 0 || ret >= text_size - written)
+    if (ret < 0 || ret >= text_size - written) {
         return(0);
+    }
+
     written += ret;
 
     if (res->content) {
         ret = snprintf(res_text + written, text_size - written, "%s", res->content);
-        if (ret < 0 || ret >= text_size - written)
+        if (ret < 0 || ret >= text_size - written) {
             return(0);
+        }
+
         written += ret;
     }
 
     return(written);
-}
-
-int check_uri(char *uri)
-{
-    if (strstr(uri, RTSP_URI) == uri)
-        return(1);
-
-    return(0);
 }
 
 int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size)
@@ -623,15 +635,13 @@ RTSP_REQUEST *construct_rtsp_request(METHOD method, const unsigned char *uri, in
         free(req);
         return(0);
     }
+
     strcpy((char *)req->uri, (char *)uri);
+
     req->uri[uri_len] = 0;
-
     req->CSeq = ++CSeq;
-
     req->Session = Session;
-
     req->cast = cast;
-
     req->client_port = client_port;
 
     return req;
@@ -669,8 +679,9 @@ RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cas
     RTSP_RESPONSE *res = 0;
 
     res = malloc(sizeof(RTSP_RESPONSE));
-    if (!res)
+    if (!res) {
         return(0);
+    }
 
     res->code = code;
     res->CSeq = req->CSeq;
@@ -790,16 +801,22 @@ RTSP_RESPONSE *rtsp_options_res(RTSP_REQUEST *req)
 
 void free_rtsp_req(RTSP_REQUEST **req)
 {
-    if ((*req)->uri)
+    if ((*req)->uri) {
         free((*req)->uri);
+    }
     free(*req);
     *req = 0;
+
+    return;
 }
 
 void free_rtsp_res(RTSP_RESPONSE **res)
 {
-    if((*res)->content)
+    if((*res)->content) {
         free((*res)->content);
+    }
     free(*res);
     *res = 0;
+
+    return;
 }
