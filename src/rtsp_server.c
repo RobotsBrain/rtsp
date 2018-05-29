@@ -20,7 +20,6 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include "internal_rtsp.h"
 #include "hashtable.h"
 #include "rtsp.h"
-#include "parse_rtsp.h"
 #include "servers_comm.h"
 
 

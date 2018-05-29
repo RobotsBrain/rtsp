@@ -8,9 +8,13 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "parse_rtsp.h"
 
-int main() {
+#include "rtsp.h"
+
+
+
+int main(int argc, char** argv)
+{
     int st;
     int err = 0;
     RTSP_REQUEST req;

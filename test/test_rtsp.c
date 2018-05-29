@@ -8,7 +8,6 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <string.h>
 #include <stdio.h>
 
-#include "parse_rtsp.h"
 #include "rtsp.h"
 
 

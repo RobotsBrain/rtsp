@@ -9,6 +9,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define _RTCP_H_
 
 char *pack_rtcp_sr(unsigned int ssrc, struct timeval ntp_timestamp,
-                   unsigned int rtp_timestamp, unsigned int packet_count, unsigned long octet_count);
+                   unsigned int rtp_timestamp, unsigned int packet_count,
+                   unsigned long octet_count);
 
 #endif

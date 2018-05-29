@@ -10,9 +10,9 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <string.h>
 #include <stdio.h>
 
-#include "parse_sdp.h"
+#include "sdp.h"
 
-
+#define N_MEDIA_TYPE 2
 const char* MEDIA_TYPE_STR[] = {"audio\0", "video\0"};
 
 /*
@@ -55,16 +55,6 @@ int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size)
     sdp_text[written] = 0;
 
     return(written);
-}
-
-int unpack_sdp2(SDP **sdp, unsigned char *sdp_text, int sdp_size)
-{
-    *sdp = (SDP*)malloc(sizeof(SDP));
-    if (!(*sdp)) {
-        return(0);
-    }
-
-    return unpack_sdp(*sdp, sdp_text, sdp_size);
 }
 
 /*
@@ -159,7 +149,18 @@ int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
         }
     }
 
-    return(1);
+    return 1;
+}
+
+#if 0
+int unpack_sdp2(SDP **sdp, unsigned char *sdp_text, int sdp_size)
+{
+    *sdp = (SDP*)malloc(sizeof(SDP));
+    if (!(*sdp)) {
+        return(0);
+    }
+
+    return unpack_sdp(*sdp, sdp_text, sdp_size);
 }
 
 void free_sdp(SDP **sdp)
@@ -182,4 +183,5 @@ void free_sdp(SDP **sdp)
 
     return;
 }
+#endif
 

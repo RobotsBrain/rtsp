@@ -6,11 +6,14 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
-#include "parse_rtp.h"
+#include <stdio.h>
 
-int main() {
+#include "rtp.h"
+
+
+int main(int argc, char** argv)
+{
     int i;
     int ret;
     RTP_PKG pkg1[1], pkg2[1];
@@ -21,11 +24,13 @@ int main() {
     pkg1->header->ssrc = 1000;
 
     pkg1->data = malloc(100);
-    if (!pkg1->data)
+    if (!pkg1->data) {
         return(0);
+    }
 
-    for (i = 0; i < 100; ++i)
+    for (i = 0; i < 100; ++i) {
         pkg1->data[i] = 'a';
+    }
     pkg1->d_size = 100;
 
     ret = pack_rtp(pkg1, (unsigned char *)pkg, 1024);
@@ -35,9 +40,7 @@ int main() {
         return(0);
     }
 
-
     ret = unpack_rtp(pkg2, (unsigned char *)pkg, ret);
-
     if (!ret) {
         fprintf(stderr, "Error unpacking\n");
         free(pkg1->data);

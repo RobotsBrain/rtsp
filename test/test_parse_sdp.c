@@ -8,11 +8,13 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "parse_sdp.h"
+
+#include "sdp.h"
 
 
 
-int main () {
+int main(int argc, char** argv)
+{
     int ret;
     int err = 0;
     SDP sdp;
@@ -110,7 +112,9 @@ int main () {
         }
     } while (*(++sdp_ptr));
 
-    if (!err)
+    if (!err) {
         fprintf(stderr, "Correct tests\n");
+    }
+
     return 0;
 }

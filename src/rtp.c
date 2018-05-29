@@ -9,14 +9,15 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <string.h>
 #include <stdlib.h>
 
-#include "parse_rtp.h"
+#include "rtp.h"
 
+#define RTP_MIN_SIZE 12
 const unsigned char start_pkg[] = {128, 0};
 
-/*
- * return: Size of packet. 0 is error
- */
-int pack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size) {
+
+
+int pack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size)
+{
     unsigned short num_s;
     unsigned long num_l;
     if (pkg_max_size < RTP_MIN_SIZE || pkg->d_size > pkg_max_size - RTP_MIN_SIZE)
@@ -44,7 +45,8 @@ int pack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size) {
 /*
  * return: Size of data. 0 if error
  */
-int unpack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size) {
+int unpack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size)
+{
     unsigned short num_s;
     unsigned long num_l;
     if (pkg_max_size < RTP_MIN_SIZE)

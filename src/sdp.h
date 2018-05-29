@@ -5,32 +5,31 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 
 THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
-#ifndef _PARSE_RTP_
-#define _PARSE_RTP_
+#ifndef _PARSE_SDP_H
+#define _PARSE_SDP_H
 
+
+
+/* No dar valores especificos a los MEDIA_TYPE */
+typedef enum {
+	AUDIO = 0,
+	VIDEO
+} MEDIA_TYPE;
 
 typedef struct {
-    unsigned short seq;
-    unsigned int timestamp;
-    unsigned int ssrc;
-} RTP_HEADER;
+    MEDIA_TYPE type;
+    unsigned short port;
+    unsigned char *uri;
+} MEDIA;
 
 typedef struct {
-    RTP_HEADER header[1];
-    unsigned char *data; /* Reserved memory when parsing */
-    int d_size;
-} RTP_PKG;
+    unsigned char *uri;
+    MEDIA (*medias)[1];
+    int n_medias;
+} SDP;
 
-#define RTP_MIN_SIZE 12
+int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size);
 
-/*
- * return: Size of packet. 0 is error
- */
-int pack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size);
-
-/*
- * return: Size of data. 0 if error
- */
-int unpack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size);
+int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size);
 
 #endif
