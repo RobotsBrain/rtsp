@@ -21,7 +21,6 @@ char *pack_rtcp_sr(unsigned int ssrc, struct timeval ntp_timestamp,
     char *packet = NULL;
     unsigned int tmp;
 
-    /* Reserve memory for the RTCP packet */
     packet = (char*)malloc(32*7);
     if (!packet) {
         return(0);

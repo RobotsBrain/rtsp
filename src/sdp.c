@@ -17,9 +17,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define N_MEDIA_TYPE 2
 const char* MEDIA_TYPE_STR[] = {"audio\0", "video\0"};
 
-/*
- * return: Size of sdp_text. 0 is error
- */
+
 int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size)
 {
     int i = 0;
@@ -66,9 +64,6 @@ int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size)
     return written;
 }
 
-/*
- * return: 1 ok 0 err
- */
 int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
 {
     unsigned char *media = NULL;
@@ -164,36 +159,4 @@ int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
     return 1;
 }
 
-#if 0
-int unpack_sdp2(SDP **sdp, unsigned char *sdp_text, int sdp_size)
-{
-    *sdp = (SDP*)malloc(sizeof(SDP));
-    if (!(*sdp)) {
-        return(0);
-    }
-
-    return unpack_sdp(*sdp, sdp_text, sdp_size);
-}
-
-void free_sdp(SDP **sdp)
-{
-    int i = 0;
-
-    if ((*sdp)->uri) {
-        free((*sdp)->uri);
-    }
-
-    for (i=0; i < (*sdp)->n_medias; ++i) {
-        if ((*sdp)->medias[i]->uri) {
-            free((*sdp)->medias[i]->uri);
-        }
-    }
-
-    free((*sdp)->medias);
-    free(*sdp);
-    *sdp = 0;
-
-    return;
-}
-#endif
 
