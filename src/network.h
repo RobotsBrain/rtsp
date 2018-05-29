@@ -44,13 +44,6 @@ int extract_uri(char *uri, char **host, char **path);
  */
 int bind_UDP_ports(int *rtp_sockfd, int *rtcp_sockfd);
 
-/* Puts the current thread to sleep
- * seconds: amount of seconds it will sleep
- * nanoseconds: amount of nanoseconds it will sleep
- * NOTE: It will sleep seconds + nanoseconds.
- */
-void time_sleep(int seconds, int nanoseconds);
-
 
 /* Prototype for the function that creates workers
  * 1st parameter: Int where the socket will be passed

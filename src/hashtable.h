@@ -30,19 +30,19 @@ unsigned long longhash(void *n);
 int longequal(void *a, void *b);
 
 /*@null@*/
-hashtable* newhashtable (hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelements);
+hashtable* newhashtable(hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelements);
 
-void freehashtable (hashtable **ht);
+void freehashtable(hashtable **ht);
 
-void clearhashtable (hashtable **ht);
+void clearhashtable(hashtable **ht);
 
-Hashstatus puthashtable (hashtable **ht, void *key, void *value);
+Hashstatus puthashtable(hashtable **ht, void *key, void *value);
 
-
-/*@null@*/
-void* gethashtable (hashtable **ht, void *key);
 
 /*@null@*/
-Hashstatus delhashtable (hashtable **ht, void *key);
+void* gethashtable(hashtable **ht, void *key);
+
+/*@null@*/
+Hashstatus delhashtable(hashtable **ht, void *key);
 
 #endif /*HASHTABLE_*/

@@ -9,14 +9,14 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define _INTERNAL_RTSP_H_
 
 typedef struct {
-    unsigned int ssrc;
-    unsigned int my_ip; /* My ip */
-    unsigned short my_port; /* My port */
-    unsigned int ip; /* Destination ip */
-    unsigned short port; /* Destination port */
-    unsigned int last_played; /* Timestamp in msec of the last played fragment */
-    unsigned short seq; /* Sequence number. Initialized randomly */
-    unsigned int timestamp_base; /* Random base for timestamp */
+    unsigned int 	ssrc;
+    unsigned int 	my_ip; /* My ip */
+    unsigned short 	my_port; /* My port */
+    unsigned int 	ip; /* Destination ip */
+    unsigned short 	port; /* Destination port */
+    unsigned int 	last_played; /* Timestamp in msec of the last played fragment */
+    unsigned short 	seq; /* Sequence number. Initialized randomly */
+    unsigned int 	timestamp_base; /* Random base for timestamp */
 } INTERNAL_RTP;
 
 #endif

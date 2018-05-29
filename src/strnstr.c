@@ -16,8 +16,14 @@ char *strnstr(const char *s1, const char *s2, size_t n)
     char *result = NULL;
 
     buf = malloc(n + 1);
+    if(buf == NULL) {
+        return NULL;
+    }
+
+    memset(buf, 0, n + 1);
+
     strncpy(buf, s1, n);
-    buf[n] = 0;
+
     ptr = strstr(buf, s2);
     if (!ptr) {
         result = 0;
@@ -26,7 +32,28 @@ char *strnstr(const char *s1, const char *s2, size_t n)
     }
 
     free(buf);
+    buf = NULL;
 
     return result;
 }
 
+
+#if 0
+/* Puts the thread to sleep
+ * thread: Thread which will be put to sleep
+ * sec: amount of seconds it will sleep
+ * usec: amount of microseconds it will sleep
+ * NOTE: It will sleep seconds + nanoseconds.
+ */
+void time_sleep(int sec, int usec)
+{
+    struct timespec t, tr;
+
+    t.tv_sec = sec;
+    t.tv_nsec = usec * 1000;
+
+    nanosleep(&t, &tr);
+
+    return;
+}
+#endif

@@ -297,24 +297,6 @@ int bind_UDP_ports(int *rtp_sockfd, int *rtcp_sockfd)
     return(first_port);
 }
 
-/* Puts the thread to sleep
- * thread: Thread which will be put to sleep
- * sec: amount of seconds it will sleep
- * usec: amount of microseconds it will sleep
- * NOTE: It will sleep seconds + nanoseconds.
- */
-void time_sleep(int sec, int usec)
-{
-    struct timespec t, tr;
-
-    t.tv_sec = sec;
-    t.tv_nsec = usec * 1000;
-
-    nanosleep(&t, &tr);
-
-    return;
-}
-
 #define MAX_QUEUE_SIZE 20
 
 int accept_tcp_requests(unsigned short port, int *sockfd, unsigned int *my_addr,
