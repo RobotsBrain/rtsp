@@ -23,35 +23,25 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include "servers_comm.h"
 
 
-#define REQ_BUFFER 4096
-#define MAX_RTSP_WORKERS 20 /* Number of processes listening for rtsp connections */
-#define MAX_IDLE_TIME 60 /* Number of seconds a worker can be idle before is killed */
+#define REQ_BUFFER          4096
+#define MAX_RTSP_WORKERS    20 /* Number of processes listening for rtsp connections */
+#define MAX_IDLE_TIME       60 /* Number of seconds a worker can be idle before is killed */
 
 typedef struct {
-    int used;
-    pthread_t thread_id;
-    time_t time_contacted;
-    int sockfd;
+    int         used;
+    pthread_t   thread_id;
+    time_t      time_contacted;
+    int         sockfd;
     struct sockaddr_storage client_addr;
 } WORKER;
 
 void *rtsp_worker_fun(void *arg);
 void *rtsp_worker_terminator_fun(void *arg);
 void *rtp_messenger_fun(void *arg);
-RTSP_RESPONSE *rtsp_server_options(WORKER *self, RTSP_REQUEST *req);
-RTSP_RESPONSE *rtsp_server_describe(WORKER *self, RTSP_REQUEST *req);
-RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req, INTERNAL_RTSP *rtsp_info);
-RTSP_RESPONSE *rtsp_server_play(WORKER *self, RTSP_REQUEST *req);
-RTSP_RESPONSE *rtsp_server_pause(WORKER *self, RTSP_REQUEST *req);
-RTSP_RESPONSE *rtsp_server_teardown(WORKER *self, RTSP_REQUEST *req);
-int rtp_send_create_unicast_connection(RTP_TO_RTSP *data_from_rtp, char *uri, int Session, struct sockaddr_storage *client_addr);
-int get_session(int *ext_session, INTERNAL_RTSP **rtsp_info);
-int rtsp_worker_create(int tmp_sockfd, struct sockaddr_storage *client_addr);
 
-/* Port for communication with rtp servers */
-unsigned short rtp_comm_port;
-/* My ip */
-unsigned int my_addr;
+
+unsigned short rtp_comm_port;  /* Port for communication with rtp servers */
+unsigned int my_addr;  /* My ip */
 
 void (*signal(int sig, void (*func)(int)))(int);
 /* Workers array where the information of each worker will be saved */
@@ -62,18 +52,10 @@ pthread_mutex_t workers_mutex;
 /* Hashtable where the sessions will be stored */
 hashtable *session_hash;
 pthread_mutex_t hash_mutex;
-
-/* Server socket descriptor */
-int sockfd;
-
-/* Pid of RTP process */
-pid_t rtp_proc;
-
-/* Pthread that checks for idle worker */
-pthread_t worker_terminator;
-
-/* Pthread that gets petitions from RTP */
-pthread_t rtp_messenger;
+int sockfd;  /* Server socket descriptor */
+pid_t rtp_proc;  /* Pid of RTP process */
+pthread_t worker_terminator;  /* Pthread that checks for idle worker */
+pthread_t rtp_messenger;  /* Pthread that gets petitions from RTP */
 
 /* Free all resources from the server */
 void rtsp_server_stop(int sig)
@@ -181,32 +163,17 @@ int initialize_rtsp_globals()
 
     /* Create thread that checks idle workers */
     st = pthread_create(&worker_terminator, 0, rtsp_worker_terminator_fun, 0);
-    if (st)
+    if (st) {
         kill(getpid(), SIGINT);
+    }
 
     /* Create thread that gets petitions from RTP */
     st = pthread_create(&rtp_messenger, 0, rtp_messenger_fun, 0);
-    if (st)
+    if (st) {
         kill(getpid(), SIGINT);
+    }
 
-    return(1);
-}
-
-int rtsp_server(unsigned short port, unsigned short rtp_port)
-{
-    int st;
-
-    rtp_comm_port = rtp_port;
-    st = initialize_rtsp_globals();
-    if (!st)
-        return(0);
-
-    accept_tcp_requests(port, &sockfd, &my_addr, rtsp_worker_create);
-
-    /* If we reach this point, there has been a severe error. Terminate */
-    kill(getpid(), SIGINT);
-
-    return(0);
+    return 1;
 }
 
 void *rtsp_worker_terminator_fun(void *arg)
@@ -246,16 +213,13 @@ void *rtp_messenger_fun(void *arg)
     return(0);
 }
 
-/* Create a new rtsp worker
- * tmp_sockfd: Socket number
- * client_addr: Structure with the information of the client
- * returns 0 on error
- */
 int rtsp_worker_create(int tmp_sockfd, struct sockaddr_storage *client_addr)
 {
     int i;
     int st;
+
     pthread_mutex_lock(&workers_mutex);
+
     if (n_workers < MAX_RTSP_WORKERS) {
         /* Find an unused worker */
         for (i = 0; i < MAX_RTSP_WORKERS; ++i)
@@ -264,8 +228,9 @@ int rtsp_worker_create(int tmp_sockfd, struct sockaddr_storage *client_addr)
 
             /* Create worker */
             st = pthread_create(&workers[i]->thread_id, 0, rtsp_worker_fun, &workers[i]);
-            if (st) 
+            if (st) {
                 return(0);
+            }
 
             workers[i]->used = 1;
             /* Save socket info */
@@ -281,160 +246,31 @@ int rtsp_worker_create(int tmp_sockfd, struct sockaddr_storage *client_addr)
 
     pthread_mutex_unlock(&workers_mutex);
 
-    return(1);
+    return 1;
 }
 
-void *rtsp_worker_fun(void *arg)
+int rtsp_server(unsigned short port, unsigned short rtp_port)
 {
-    WORKER *self = arg;
-    int sockfd;
-    char buf[REQ_BUFFER];
-    int ret;
     int st;
-    RTSP_REQUEST req[1];
-    RTSP_RESPONSE *res;
-    int server_error;
-    int Session;
-    INTERNAL_RTSP *rtsp_info = 0;
-    int CSeq = 0;
 
-    pthread_mutex_lock(&workers_mutex);
-    sockfd = self->sockfd;
-    pthread_mutex_unlock(&workers_mutex);
-
-    for(;;) {
-        rtsp_info = 0;
-        Session = -1;
-        /* Wait to get a correct request */
-        do {
-            server_error = 0;
-
-            st = receive_message(sockfd, buf, REQ_BUFFER);
-            if (st == -1) {
-                return(0);
-            } else if (!st) {
-                server_error = 1;
-            }
-
-            st = unpack_rtsp_req(req, buf, st);
-            /* If there was an error return err*/
-            if (server_error && st) {
-                fprintf(stderr, "caca1\n");
-                res = rtsp_servererror(req);
-                if (res) {
-                    st = pack_rtsp_res(res, buf, REQ_BUFFER);
-                    if (st) {
-                        buf[st] = 0;
-                        send(sockfd, buf, st, 0);
-                    }
-                    free_rtsp_res(&res);
-                }
-            } else if (server_error || !st) {
-                memcpy(buf, "RTSP/1.0 500 Internal server error\r\n\r\n", 38);
-                buf[38] = 0;
-                send(sockfd, buf, strlen(buf), 0);
-            }
-        } while (server_error || !st);
-
-        /* Correct request */
-        /* Process request */
-
-        /* Get or create session */
-        st = get_session(&(req->Session), &rtsp_info);
-
-        /* Check that CSeq is incrementing */
-        if (req->CSeq <= CSeq) {
-            res = rtsp_servererror(req);
-        } else {
-            CSeq = req->CSeq;
-            switch (req->method) {
-                case OPTIONS:
-                    req->Session = 0;
-                    res = rtsp_server_options(self, req);
-                    pthread_mutex_lock(&workers_mutex);
-                    self->time_contacted = time(0);
-                    pthread_mutex_unlock(&workers_mutex);
-                    break;
-
-                case DESCRIBE:
-                    req->Session = 0;
-                    res = rtsp_server_describe(self, req);
-                    pthread_mutex_lock(&workers_mutex);
-                    self->time_contacted = time(0);
-                    pthread_mutex_unlock(&workers_mutex);
-                    break;
-
-                case SETUP:
-                    res = rtsp_server_setup(self, req, rtsp_info);
-                    pthread_mutex_lock(&workers_mutex);
-                    self->time_contacted = time(0);
-                    pthread_mutex_unlock(&workers_mutex);
-                    break;
-
-                case PLAY:
-                    fprintf(stderr, "Recibido play\n");
-                    if (!rtsp_info) {
-                        res = rtsp_servererror(req);
-                    } else {
-                        res = rtsp_server_play(self, req);
-                        pthread_mutex_lock(&workers_mutex);
-                        self->time_contacted = time(0);
-                        pthread_mutex_unlock(&workers_mutex);
-                    }
-                    break;
-
-                case PAUSE:
-                    if (!rtsp_info) {
-                        res = rtsp_servererror(req);
-                    } else {
-                        res = rtsp_server_pause(self, req);
-                        pthread_mutex_lock(&workers_mutex);
-                        self->time_contacted = time(0);
-                        pthread_mutex_unlock(&workers_mutex);
-                    }
-                    break;
-
-                case TEARDOWN:
-                    if (!rtsp_info) {
-                        res = rtsp_servererror(req);
-                    } else {
-                        res = rtsp_server_teardown(self, req);
-                        pthread_mutex_lock(&workers_mutex);
-                        self->time_contacted = time(0);
-                        pthread_mutex_unlock(&workers_mutex);
-                    }
-                    break;
-
-                default:
-                    fprintf(stderr, "caca2\n");
-                    res = rtsp_servererror(req);
-                    break;
-            }
-        }
-
-        if (res) {
-            st = pack_rtsp_res(res, buf, REQ_BUFFER);
-            if (st) {
-                buf[st] = 0;
-                write(2, buf, st);
-                send(sockfd, buf, st, 0);
-            }
-            free_rtsp_res(&res);
-        }
-
-        if (req->uri) {
-            free(req->uri);
-        }
+    rtp_comm_port = rtp_port;
+    st = initialize_rtsp_globals();
+    if (!st) {
+        return(0);
     }
 
-    return NULL;
+    accept_tcp_requests(port, &sockfd, &my_addr, rtsp_worker_create);
+
+    /* If we reach this point, there has been a severe error. Terminate */
+    kill(getpid(), SIGINT);
+
+    return(0);
 }
 
 RTSP_RESPONSE *rtsp_server_options(WORKER *self, RTSP_REQUEST *req)
 {
     return(rtsp_options_res(req));
 }
-
 
 RTSP_RESPONSE *rtsp_server_describe(WORKER *self, RTSP_REQUEST *req)
 {
@@ -443,6 +279,93 @@ RTSP_RESPONSE *rtsp_server_describe(WORKER *self, RTSP_REQUEST *req)
     } else {
         return(rtsp_notfound(req));
     }
+}
+
+int rtp_send_create_unicast_connection(RTP_TO_RTSP *data_from_rtp, char *uri,
+                                        int Session, struct sockaddr_storage *client_addr)
+{
+    RTSP_TO_RTP setup_msg;
+    int st;
+    int sockfd;
+    int rcv_sockfd;
+    int rtp_sockfd;
+    char *host, *path;
+    struct addrinfo hints, *res;
+    struct sockaddr rtp_addr;
+    unsigned short port;
+    char port_str[6];
+    int rtp_addr_len = sizeof(struct sockaddr);
+
+    setup_msg.order = SETUP_RTP_UNICAST;
+    strcpy(setup_msg.uri, uri);
+    setup_msg.Session = Session;
+    setup_msg.client_ip = ((struct sockaddr_in *)client_addr)->sin_addr.s_addr;
+    setup_msg.client_port = ((struct sockaddr_in *)client_addr)->sin_port;
+
+    /* TODO: Send to rtp server */
+    st = extract_uri(setup_msg.uri, &host, &path);
+    if (!st || !host || !path)
+        return(0);
+    fprintf(stderr, "%s\n", host);
+
+    /* Open receive socket */
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+
+    do {
+        port = rand();
+        if (!snprintf(port_str, 5, "%d", port))
+            return(0);
+        if (getaddrinfo(0, port_str, &hints, &res))
+            return(0);
+
+        rcv_sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+        if (rcv_sockfd == -1)
+            return(0);
+
+        st = bind(rcv_sockfd, res->ai_addr, res->ai_addrlen);
+
+        port = ((struct sockaddr_in*)(res->ai_addr))->sin_port;
+        freeaddrinfo(res);
+    } while (st == -1);
+    /* Listen in rcv_sockfd */
+    st = listen(rcv_sockfd, 1);
+    if (st == -1)
+        return(0);
+
+    setup_msg.response_port = port;
+    fprintf(stderr, "Listening on port %d\n", port);
+
+    sockfd = TCP_connect(host, rtp_comm_port);
+    if (host)
+        free(host);
+    if (path)
+        free(path);
+    if(!sockfd)
+        return(0);
+    st = send(sockfd, &setup_msg, sizeof(RTSP_TO_RTP), 0);
+    if (!st)
+        return(0);
+    close(sockfd);
+
+    /* Open rtp_socket */
+    rtp_sockfd = accept(rcv_sockfd, &rtp_addr, &rtp_addr_len);
+    st = recv(rtp_sockfd, data_from_rtp, sizeof(RTP_TO_RTSP), 0);
+
+    close(rcv_sockfd);
+    close(rtp_sockfd);
+    if (!st) {
+        return(0);
+    }
+    fprintf(stderr, "order: %d\n", data_from_rtp->order);
+    fprintf(stderr, "ssrc recibido: %d\n", data_from_rtp->ssrc);
+    if (data_from_rtp->order == ERR_RTP) {
+        return(0);
+    }
+
+    return(1);
 }
 
 RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
@@ -458,10 +381,14 @@ RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
     int *Session;
 
     end_global_uri = strstr(req->uri, "/audio");
-    if (!end_global_uri)
+    if (!end_global_uri) {
         end_global_uri = strstr(req->uri, "/video");
-    if (!end_global_uri)
+    }
+
+    if (!end_global_uri) {
         return(rtsp_notfound(req));
+    }
+
     global_uri_len = end_global_uri - req->uri;
 
     /* Unicast */
@@ -821,14 +748,19 @@ RTSP_RESPONSE *rtsp_server_teardown(WORKER *self, RTSP_REQUEST *req)
 
     fprintf(stderr, "Borrando uri: %s\n", req->uri);
     end_global_uri = strstr(req->uri, "/audio");
-    if (!end_global_uri)
+    if (!end_global_uri) {
         end_global_uri = strstr(req->uri, "/video");
-    if (!end_global_uri)
+    }
+
+    if (!end_global_uri) {
         global_uri = 1;
-    if (global_uri)
+    }
+
+    if (global_uri) {
         global_uri_len = strlen(req->uri);
-    else
+    } else {
         global_uri_len = end_global_uri - req->uri;
+    }
 
     /* TODO: Borrar media */
     pthread_mutex_lock(&hash_mutex);
@@ -888,91 +820,6 @@ RTSP_RESPONSE *rtsp_server_teardown(WORKER *self, RTSP_REQUEST *req)
     return res;
 }
 
-int rtp_send_create_unicast_connection(RTP_TO_RTSP *data_from_rtp, char *uri,
-                                        int Session, struct sockaddr_storage *client_addr)
-{
-    RTSP_TO_RTP setup_msg;
-    int st;
-    int sockfd;
-    int rcv_sockfd;
-    int rtp_sockfd;
-    char *host, *path;
-    struct addrinfo hints, *res;
-    struct sockaddr rtp_addr;
-    unsigned short port;
-    char port_str[6];
-    int rtp_addr_len = sizeof(struct sockaddr);
-
-    setup_msg.order = SETUP_RTP_UNICAST;
-    strcpy(setup_msg.uri, uri);
-    setup_msg.Session = Session;
-    setup_msg.client_ip = ((struct sockaddr_in *)client_addr)->sin_addr.s_addr;
-    setup_msg.client_port = ((struct sockaddr_in *)client_addr)->sin_port;
-
-    /* TODO: Send to rtp server */
-    st = extract_uri(setup_msg.uri, &host, &path);
-    if (!st || !host || !path)
-        return(0);
-    fprintf(stderr, "%s\n", host);
-
-    /* Open receive socket */
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-
-    do {
-        port = rand();
-        if (!snprintf(port_str, 5, "%d", port))
-            return(0);
-        if (getaddrinfo(0, port_str, &hints, &res))
-            return(0);
-
-        rcv_sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-        if (rcv_sockfd == -1)
-            return(0);
-
-        st = bind(rcv_sockfd, res->ai_addr, res->ai_addrlen);
-
-        port = ((struct sockaddr_in*)(res->ai_addr))->sin_port;
-        freeaddrinfo(res);
-    } while (st == -1);
-    /* Listen in rcv_sockfd */
-    st = listen(rcv_sockfd, 1);
-    if (st == -1)
-        return(0);
-
-    setup_msg.response_port = port;
-    fprintf(stderr, "Listening on port %d\n", port);
-
-    sockfd = TCP_connect(host, rtp_comm_port);
-    if (host)
-        free(host);
-    if (path)
-        free(path);
-    if(!sockfd)
-        return(0);
-    st = send(sockfd, &setup_msg, sizeof(RTSP_TO_RTP), 0);
-    if (!st)
-        return(0);
-    close(sockfd);
-
-    /* Open rtp_socket */
-    rtp_sockfd = accept(rcv_sockfd, &rtp_addr, &rtp_addr_len);
-    st = recv(rtp_sockfd, data_from_rtp, sizeof(RTP_TO_RTSP), 0);
-
-    close(rcv_sockfd);
-    close(rtp_sockfd);
-    if (!st)
-        return(0);
-    fprintf(stderr, "order: %d\n", data_from_rtp->order);
-    fprintf(stderr, "ssrc recibido: %d\n", data_from_rtp->ssrc);
-    if (data_from_rtp->order == ERR_RTP)
-        return(0);
-
-    return(1);
-}
-
 /* Checks if a session already exists. If it doesn't, create one */
 int get_session(int *ext_session, INTERNAL_RTSP **rtsp_info)
 {
@@ -997,5 +844,151 @@ int get_session(int *ext_session, INTERNAL_RTSP **rtsp_info)
     }
 
     return 1;
+}
+
+void *rtsp_worker_fun(void *arg)
+{
+    WORKER *self = arg;
+    int sockfd;
+    char buf[REQ_BUFFER];
+    int ret;
+    int st;
+    RTSP_REQUEST req[1];
+    RTSP_RESPONSE *res;
+    int server_error;
+    int Session;
+    INTERNAL_RTSP *rtsp_info = 0;
+    int CSeq = 0;
+
+    pthread_mutex_lock(&workers_mutex);
+    sockfd = self->sockfd;
+    pthread_mutex_unlock(&workers_mutex);
+
+    for(;;) {
+        rtsp_info = 0;
+        Session = -1;
+        /* Wait to get a correct request */
+        do {
+            server_error = 0;
+
+            st = receive_message(sockfd, buf, REQ_BUFFER);
+            if (st == -1) {
+                return(0);
+            } else if (!st) {
+                server_error = 1;
+            }
+
+            st = unpack_rtsp_req(req, buf, st);
+            /* If there was an error return err*/
+            if (server_error && st) {
+                fprintf(stderr, "caca1\n");
+                res = rtsp_servererror(req);
+                if (res) {
+                    st = pack_rtsp_res(res, buf, REQ_BUFFER);
+                    if (st) {
+                        buf[st] = 0;
+                        send(sockfd, buf, st, 0);
+                    }
+                    free_rtsp_res(&res);
+                }
+            } else if (server_error || !st) {
+                memcpy(buf, "RTSP/1.0 500 Internal server error\r\n\r\n", 38);
+                buf[38] = 0;
+                send(sockfd, buf, strlen(buf), 0);
+            }
+        } while (server_error || !st);
+
+        /* Correct request */
+        /* Process request */
+
+        /* Get or create session */
+        st = get_session(&(req->Session), &rtsp_info);
+
+        /* Check that CSeq is incrementing */
+        if (req->CSeq <= CSeq) {
+            res = rtsp_servererror(req);
+        } else {
+            CSeq = req->CSeq;
+            switch (req->method) {
+                case OPTIONS:
+                    req->Session = 0;
+                    res = rtsp_server_options(self, req);
+                    pthread_mutex_lock(&workers_mutex);
+                    self->time_contacted = time(0);
+                    pthread_mutex_unlock(&workers_mutex);
+                    break;
+
+                case DESCRIBE:
+                    req->Session = 0;
+                    res = rtsp_server_describe(self, req);
+                    pthread_mutex_lock(&workers_mutex);
+                    self->time_contacted = time(0);
+                    pthread_mutex_unlock(&workers_mutex);
+                    break;
+
+                case SETUP:
+                    res = rtsp_server_setup(self, req, rtsp_info);
+                    pthread_mutex_lock(&workers_mutex);
+                    self->time_contacted = time(0);
+                    pthread_mutex_unlock(&workers_mutex);
+                    break;
+
+                case PLAY:
+                    fprintf(stderr, "Recibido play\n");
+                    if (!rtsp_info) {
+                        res = rtsp_servererror(req);
+                    } else {
+                        res = rtsp_server_play(self, req);
+                        pthread_mutex_lock(&workers_mutex);
+                        self->time_contacted = time(0);
+                        pthread_mutex_unlock(&workers_mutex);
+                    }
+                    break;
+
+                case PAUSE:
+                    if (!rtsp_info) {
+                        res = rtsp_servererror(req);
+                    } else {
+                        res = rtsp_server_pause(self, req);
+                        pthread_mutex_lock(&workers_mutex);
+                        self->time_contacted = time(0);
+                        pthread_mutex_unlock(&workers_mutex);
+                    }
+                    break;
+
+                case TEARDOWN:
+                    if (!rtsp_info) {
+                        res = rtsp_servererror(req);
+                    } else {
+                        res = rtsp_server_teardown(self, req);
+                        pthread_mutex_lock(&workers_mutex);
+                        self->time_contacted = time(0);
+                        pthread_mutex_unlock(&workers_mutex);
+                    }
+                    break;
+
+                default:
+                    fprintf(stderr, "caca2\n");
+                    res = rtsp_servererror(req);
+                    break;
+            }
+        }
+
+        if (res) {
+            st = pack_rtsp_res(res, buf, REQ_BUFFER);
+            if (st) {
+                buf[st] = 0;
+                write(2, buf, st);
+                send(sockfd, buf, st, 0);
+            }
+            free_rtsp_res(&res);
+        }
+
+        if (req->uri) {
+            free(req->uri);
+        }
+    }
+
+    return NULL;
 }
 
