@@ -8,8 +8,6 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #ifndef _PARSE_SDP_H
 #define _PARSE_SDP_H
 
-// #include "common.h"
-
 #define N_MEDIA_TYPE 2
 
 /* No dar valores especificos a los MEDIA_TYPE */

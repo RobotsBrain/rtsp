@@ -7,14 +7,31 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 */
 #ifndef _PARSE_RTSP_H_
 #define _PARSE_RTSP_H_
-// #include "common.h"
-
-typedef enum {UNICAST = 0, MULTICAST} TRANSPORT_CAST;
-
-typedef enum {ACCEPT_STR = 0, CONTENT_TYPE_STR, CONTENT_LENGTH_STR, CSEQ_STR, SESSION_STR, TRANSPORT_STR} ATTR;
 
 
-typedef enum {DESCRIBE = 0, PLAY, PAUSE, SETUP, TEARDOWN, OPTIONS} METHOD;
+typedef enum {
+    UNICAST = 0,
+    MULTICAST
+} TRANSPORT_CAST;
+
+typedef enum {
+    ACCEPT_STR = 0,
+    CONTENT_TYPE_STR,
+    CONTENT_LENGTH_STR,
+    CSEQ_STR,
+    SESSION_STR,
+    TRANSPORT_STR
+} ATTR;
+
+
+typedef enum {
+    DESCRIBE = 0,
+    PLAY,
+    PAUSE,
+    SETUP,
+    TEARDOWN,
+    OPTIONS
+} METHOD;
 
 typedef struct {
     METHOD method;

@@ -8,7 +8,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 /* hashtable.c: Open addressing hashtable implementation */
 #include <stdlib.h>
-#include <strings.h>
+#include <string.h>
 #include <stdio.h>
 
 #include "hashtable.h"
@@ -36,43 +36,46 @@ struct _hashtable {
     short freeelems;
 };
 
-unsigned long stringhash (unsigned char *str)
+unsigned long stringhash(unsigned char *str)
 {
     unsigned long hash = 5381;
     int c;
 
-    while ( (c = *str++) )
+    while ( (c = *str++) ) {
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    }
 
     return(hash);
 }
 
-int stringequal (void *a, void *b)
+int stringequal(void *a, void *b)
 {
     return(!strcmp ((char *)a, (char *)b));
 }
 
-unsigned long longhash (void *n)
+unsigned long longhash(void *n)
 {
     unsigned long l_n;
     l_n = *(int *)n;
+
     return(l_n);
 }
 
-int longequal (void *a, void *b)
+int longequal(void *a, void *b)
 {
     return((*(int*)a == *(int*)b));
 }
 
-void freehashtable (hashtable **ht)
+void freehashtable(hashtable **ht)
 {
     free ((*ht)->cells);
     free (*ht);
     *ht = NULL;
+
     return;
 }
 
-void clearhashtable (hashtable **ht)
+void clearhashtable(hashtable **ht)
 {
     cell *curcell;
     curcell = (*ht)->cells + (*ht)->size;
@@ -87,15 +90,18 @@ void clearhashtable (hashtable **ht)
         bzero((*ht)->cells, sizeof(cell) * (*ht)->size);
     }
     (*ht)->nelems = 0;
+
     return;
 }
 
-static Hashstatus transfercells (hashtable **dest, hashtable **orig)
+static Hashstatus transfercells(hashtable **dest, hashtable **orig)
 {
     Hashstatus st;
     cell *curcell;
+
     if ((*dest)->size < (*orig)->nelems)
         return(ERR);
+
     curcell = (*orig)->cells + (*orig)->size;
 
     while (curcell-- != (*orig)->cells)
@@ -103,16 +109,19 @@ static Hashstatus transfercells (hashtable **dest, hashtable **orig)
             if ( (st = puthashtable (dest, curcell->key, curcell->value)) != OK ) {
                 return(st);
             }
+
     return(OK);
 }
 
-static Hashstatus doublehashtable (hashtable **ht)
+static Hashstatus doublehashtable(hashtable **ht)
 {
     hashtable *newht;
     Hashstatus st;
     if ( (newht = newhashtable ((*ht)->calchash, (*ht)->equalkeys, (*ht)->size*2 + 1, (*ht)->freeelems)) == NULL )
         return(ERR);
+
     newht->minsize = (*ht)->minsize;
+
     if ( (st = transfercells (&newht,ht)) != OK ) {
         freehashtable (&newht);
         return(st);
@@ -123,7 +132,7 @@ static Hashstatus doublehashtable (hashtable **ht)
     return(OK);
 }
 
-static Hashstatus halvehashtable (hashtable **ht)
+static Hashstatus halvehashtable(hashtable **ht)
 {
     hashtable *newht;
     unsigned long newsize;
@@ -152,7 +161,7 @@ static Hashstatus halvehashtable (hashtable **ht)
 }
 
 /*@null@*/
-hashtable* newhashtable (hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelems)
+hashtable* newhashtable(hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelems)
 {
     hashtable *ht = NULL;
     if ( (ht = (hashtable *) malloc (sizeof(hashtable))) == NULL )
@@ -174,7 +183,7 @@ hashtable* newhashtable (hashfunc hfun, cmpfunc cfun, unsigned long initsize, ch
     return(ht);
 }
 
-Hashstatus puthashtable (hashtable **ht, void *key, void *value)
+Hashstatus puthashtable(hashtable **ht, void *key, void *value)
 {
     unsigned long index;
     cell *curcell;
@@ -196,7 +205,7 @@ Hashstatus puthashtable (hashtable **ht, void *key, void *value)
 }
 
 /*@null@*/
-void* gethashtable (hashtable **ht, void *key)
+void* gethashtable(hashtable **ht, void *key)
 {
     unsigned long index;
     index = (*ht)->calchash (key) % (*ht)->size;
@@ -211,7 +220,7 @@ void* gethashtable (hashtable **ht, void *key)
 }
 
 /*@null@*/
-Hashstatus delhashtable (hashtable **ht, void *key)
+Hashstatus delhashtable(hashtable **ht, void *key)
 {
     int found;
     unsigned long index;

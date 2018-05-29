@@ -16,7 +16,6 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <pthread.h>
 
 #include "network.h"
-// #include "server_client.h"
 #include "rtsp_server.h"
 #include "internal_rtsp.h"
 #include "hashtable.h"
