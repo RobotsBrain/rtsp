@@ -12,6 +12,8 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 #include "sdp.h"
 
+
+
 #define N_MEDIA_TYPE 2
 const char* MEDIA_TYPE_STR[] = {"audio\0", "video\0"};
 
@@ -20,8 +22,8 @@ const char* MEDIA_TYPE_STR[] = {"audio\0", "video\0"};
  */
 int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size)
 {
-    int ret;
-    int i;
+    int i = 0;
+    int ret = -1;
     int written = 0;
 
     /* Save space for the last \0 */
@@ -29,32 +31,39 @@ int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size)
     sdp_text[sdp_max_size] = 0;
 
     /* Write global control uri if exists */
-    if (sdp->uri) {
+    if(sdp->uri) {
         ret = snprintf((char *)sdp_text + written, sdp_max_size, "a=control:%s\r\n", sdp->uri);
-        if (ret < 0 || ret + written >= sdp_max_size)
-            return(0);
+        if (ret < 0 || ret + written >= sdp_max_size) {
+            return 0;
+        }
+
         written += ret;
         sdp_max_size -= ret;
     }
 
     /* Write each media */
-    for (i = 0; i < sdp->n_medias; ++i) {
-        ret = snprintf((char *)sdp_text + written, sdp_max_size, "m=%s %d RTP/AVP %d\r\n", MEDIA_TYPE_STR[sdp->medias[i]->type], sdp->medias[i]->port, sdp->medias[i]->type);
-        if (ret < 0 || ret + written >= sdp_max_size)
-            return(0);
+    for(i = 0; i < sdp->n_medias; ++i) {
+        ret = snprintf((char *)sdp_text + written, sdp_max_size, "m=%s %d RTP/AVP %d\r\n",
+                        MEDIA_TYPE_STR[sdp->medias[i]->type], sdp->medias[i]->port, sdp->medias[i]->type);
+        if (ret < 0 || ret + written >= sdp_max_size) {
+            return 0;
+        }
+
         written += ret;
         sdp_max_size -= ret;
 
         ret = snprintf((char *)sdp_text + written, sdp_max_size, "a=control:%s\r\n", sdp->medias[i]->uri);
-        if (ret < 0 || ret + written >= sdp_max_size)
-            return(0);
+        if (ret < 0 || ret + written >= sdp_max_size) {
+            return 0;
+        }
+
         written += ret;
         sdp_max_size -= ret;
     }
 
     sdp_text[written] = 0;
 
-    return(written);
+    return written;
 }
 
 /*
@@ -62,8 +71,8 @@ int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size)
  */
 int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
 {
-    unsigned char *media;
-    unsigned char *control;
+    unsigned char *media = NULL;
+    unsigned char *control = NULL;
     int tok_len;
     int media_type;
     int i;
@@ -78,7 +87,7 @@ int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
     if (!media || !control) {
         free(sdp->medias);
         sdp->medias = 0;
-        return(0);
+        return 0;
     }
     media += 2;
     control += 10;
@@ -89,7 +98,7 @@ int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
         if (tok_len == sdp_size - (control - sdp_text)) {
             free(sdp->medias);
             sdp->medias = 0;
-            return(0);
+            return 0;
         }
         sdp->uri = malloc(tok_len + 1);
         memcpy(sdp->uri, control, tok_len);
@@ -100,7 +109,7 @@ int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
         if (!control) {
             free(sdp->medias);
             sdp->medias = 0;
-            return(0);
+            return 0;
         }
         control += 10;
     }
@@ -109,8 +118,9 @@ int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
         if (control < media) {
             free(sdp->medias);
             sdp->medias = 0;
-            return(0);
+            return 0;
         }
+
         for (i = 0; i < N_MEDIA_TYPE; ++i) {
             if (!strncmp((char *)media, MEDIA_TYPE_STR[i], strlen(MEDIA_TYPE_STR[i]))) {
                 media_type = i;
@@ -128,7 +138,7 @@ int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
         if (tok_len == sdp_size - (control - sdp_text)) {
             free(sdp->medias);
             sdp->medias = 0;
-            return(0);
+            return 0;
         }
         sdp->medias[sdp->n_medias]->uri = malloc(tok_len + 1);
         memcpy(sdp->medias[sdp->n_medias]->uri, control, tok_len);
@@ -138,14 +148,16 @@ int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size)
 
         media = (unsigned char *)strnstr((char *)media, "m=", sdp_size);
         control = (unsigned char *)strnstr((char *)control, "a=control:", sdp_size);
-        if (!media || !control)
+        if (!media || !control) {
             break;
+        }
+
         media += 2;
         control += 10;
         sdp->medias = realloc(sdp->medias, sizeof(MEDIA) * (sdp->n_medias + 1));
         if (!sdp->medias) {
             sdp->medias = 0;
-            return(0);
+            return 0;
         }
     }
 
