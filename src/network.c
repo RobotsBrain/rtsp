@@ -309,21 +309,23 @@ int accept_tcp_requests(unsigned short port, int *sockfd, unsigned int *my_addr,
     struct sockaddr_storage client_addr;
     unsigned int client_addr_len = sizeof(client_addr);
 
-    /* Listen incoming connections */
-    /* Code taken from http://beej.us/guide/bgnet */
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    if (!snprintf(port_str, 5, "%d", port))
-        return(0);
-    if (getaddrinfo(0, port_str, &hints, &res))
-        return(0);
+    if (!snprintf(port_str, 5, "%d", port)) {
+        return -1;
+    }
+
+    if (getaddrinfo(0, port_str, &hints, &res)) {
+        return -1;
+    }
 
     *sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (*sockfd == -1)
-        return(0);
+    if (*sockfd == -1) {
+        return -1;
+    }
 
     st = bind(*sockfd, res->ai_addr, res->ai_addrlen);
     /* Copy server address to my_addr */
@@ -331,22 +333,25 @@ int accept_tcp_requests(unsigned short port, int *sockfd, unsigned int *my_addr,
     freeaddrinfo(res);
     if (st == -1) {
         *sockfd = -1;
-        return(0);
+        return -1;
     }
 
     st = listen(*sockfd, MAX_QUEUE_SIZE);
-    if (st == -1)
-        return(0);
-
-    /* Server loop */
-    for (;;) {
-        /* Accept */
-        tmp_sockfd = accept(*sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
-        if (tmp_sockfd == -1)
-            return(0);
-        /* Create worker */
-        st = create_worker(tmp_sockfd, &client_addr);
-        if (!st)
-            close(tmp_sockfd);
+    if (st == -1) {
+        return -1;
     }
+
+    for (;;) {
+        tmp_sockfd = accept(*sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (tmp_sockfd == -1) {
+            return -1;
+        }
+
+        st = create_worker(tmp_sockfd, &client_addr);
+        if(st < 0) {
+            close(tmp_sockfd);
+        }
+    }
+
+    return 0;
 }
