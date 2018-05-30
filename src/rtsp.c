@@ -11,7 +11,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 #include "rtsp.h"
 #include "sdp.h"
-#include "strnstr.h"
+#include "utils.h"
 
 const int N_CAST = 2;
 const char *CAST_STR[] = {"unicast\0", "multicast\0"};

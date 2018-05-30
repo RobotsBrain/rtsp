@@ -5,11 +5,36 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 
 THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
-#ifndef _STRNSTR_H_
-#define _STRNSTR_H_
-
 #include <stdlib.h>
+#include <string.h>
 
-char *strnstr(const char *s1, const char *s2, size_t n);
 
-#endif
+
+char *strnstr(const char *s1, const char *s2, size_t n)
+{
+    char *buf = NULL;
+    char *ptr = NULL;
+    char *result = NULL;
+
+    buf = (char*)malloc(n + 1);
+    if(buf == NULL) {
+        return NULL;
+    }
+
+    memset(buf, 0, n + 1);
+
+    strncpy(buf, s1, n);
+
+    ptr = strstr(buf, s2);
+    if (!ptr) {
+        result = 0;
+    } else {
+        result = s1 + (ptr - buf);
+    }
+
+    free(buf);
+    buf = NULL;
+
+    return result;
+}
+

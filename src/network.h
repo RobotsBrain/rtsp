@@ -11,6 +11,10 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 #include <netinet/in.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 int TCP_connect(const char *address, unsigned short port);
 
 void TCP_disconnect(int sockfd);
@@ -60,5 +64,9 @@ typedef int (*WORKER_CREATOR)(int, struct sockaddr_storage*);
  */
 int accept_tcp_requests(unsigned short port, int *sockfd, unsigned int *my_addr,
 						WORKER_CREATOR create_worker);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif

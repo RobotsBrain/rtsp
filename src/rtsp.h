@@ -10,6 +10,11 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 #include "sdp.h"
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 typedef enum {
     UNICAST = 0,
     MULTICAST
@@ -150,5 +155,9 @@ void free_rtsp_req(RTSP_REQUEST **req);
  * res: Response
  */
 void free_rtsp_res(RTSP_RESPONSE **res);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif

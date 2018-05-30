@@ -8,8 +8,16 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #ifndef _RTCP_H_
 #define _RTCP_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 char *pack_rtcp_sr(unsigned int ssrc, struct timeval ntp_timestamp,
                    unsigned int rtp_timestamp, unsigned int packet_count,
                    unsigned long octet_count);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif

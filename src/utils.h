@@ -5,14 +5,16 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 
 THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
-#ifndef _RTSP_SERVER_H_
-#define _RTSP_SERVER_H_
+#ifndef _UTILS_H_
+#define _UTILS_H_
+
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-int rtsp_server(unsigned short port);
+char *strnstr(const char *s1, const char *s2, size_t n);
 
 #ifdef __cplusplus
 }

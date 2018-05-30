@@ -9,6 +9,10 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define _PARSE_RTP_
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 typedef struct {
     unsigned short seq;
     unsigned int timestamp;
@@ -27,5 +31,9 @@ int pack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size);
 
 
 int unpack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif

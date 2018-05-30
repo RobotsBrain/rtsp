@@ -19,6 +19,7 @@ struct _cell {
     void *key;
     void *value;
 };
+
 /* Open addressing hashtable implementation
    The size of the table is doubled when nelems/size > 0.75
    The size of the table is halved when nelems/size < 0.25
@@ -36,22 +37,22 @@ struct _hashtable {
     short freeelems;
 };
 
-unsigned long stringhash(unsigned char *str)
-{
-    unsigned long hash = 5381;
-    int c;
+// unsigned long stringhash(unsigned char *str)
+// {
+//     unsigned long hash = 5381;
+//     int c;
 
-    while ( (c = *str++) ) {
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-    }
+//     while ( (c = *str++) ) {
+//         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+//     }
 
-    return(hash);
-}
+//     return(hash);
+// }
 
-int stringequal(void *a, void *b)
-{
-    return(!strcmp ((char *)a, (char *)b));
-}
+// int stringequal(void *a, void *b)
+// {
+//     return(!strcmp ((char *)a, (char *)b));
+// }
 
 unsigned long longhash(void *n)
 {

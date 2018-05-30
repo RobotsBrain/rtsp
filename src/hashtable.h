@@ -9,6 +9,10 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #ifndef HASHTABLE_
 #define HASHTABLE_
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 typedef enum {
 	OK,
 	ERR,
@@ -21,28 +25,32 @@ typedef struct _hashtable hashtable;
 typedef unsigned long (*hashfunc) (void *);
 typedef int (*cmpfunc) (void *, void *);
 
-unsigned long stringhash(unsigned char *str);
-
-int stringequal(void *a, void *b);
 
 unsigned long longhash(void *n);
 
+
 int longequal(void *a, void *b);
 
-/*@null@*/
+
 hashtable* newhashtable(hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelements);
+
 
 void freehashtable(hashtable **ht);
 
+
 void clearhashtable(hashtable **ht);
+
 
 Hashstatus puthashtable(hashtable **ht, void *key, void *value);
 
 
-/*@null@*/
 void* gethashtable(hashtable **ht, void *key);
 
-/*@null@*/
+
 Hashstatus delhashtable(hashtable **ht, void *key);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /*HASHTABLE_*/

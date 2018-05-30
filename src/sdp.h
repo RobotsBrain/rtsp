@@ -8,9 +8,10 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #ifndef _PARSE_SDP_H
 #define _PARSE_SDP_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
-
-/* No dar valores especificos a los MEDIA_TYPE */
 typedef enum {
 	AUDIO = 0,
 	VIDEO
@@ -31,5 +32,9 @@ typedef struct {
 int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size);
 
 int unpack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_size);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif
