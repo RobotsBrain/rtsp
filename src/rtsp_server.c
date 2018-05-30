@@ -16,7 +16,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 #include "network.h"
 #include "rtsp_server.h"
-#include "internal_rtsp.h"
+// #include "internal_rtsp.h"
 #include "hashtable.h"
 #include "rtsp.h"
 #include "servers_comm.h"
@@ -25,6 +25,25 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define REQ_BUFFER          4096
 #define MAX_RTSP_WORKERS    20 /* Number of processes listening for rtsp connections */
 #define MAX_IDLE_TIME       60 /* Number of seconds a worker can be idle before is killed */
+
+typedef struct {
+    unsigned char *media_uri; /* Uri for the media */
+    unsigned int ssrc; /* Use the ssrc to locate the corresponding RTP session */
+} INTERNAL_MEDIA;
+
+typedef struct {
+    unsigned char *global_uri; /* Global control uri */
+    INTERNAL_MEDIA (*medias)[1];
+    int n_medias;
+} INTERNAL_SOURCE;
+
+typedef struct {
+    int Session;
+    int CSeq;
+    struct sockaddr_storage client_addr;
+    INTERNAL_SOURCE (*sources)[1];
+    int n_sources;
+} INTERNAL_RTSP;
 
 typedef struct {
     int         used;
