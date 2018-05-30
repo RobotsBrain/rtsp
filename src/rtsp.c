@@ -611,15 +611,13 @@ int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
         written += ret;
     }
 
-    return(written);
+    return written;
 }
-
-/* CSeq global variable for auto incrementing it inside the module */
-int CSeq = 0;
 
 RTSP_REQUEST *construct_rtsp_request(METHOD method, const unsigned char *uri, int Session,
                                     TRANSPORT_CAST cast, unsigned short client_port)
 {
+    int CSeq = 0;
     RTSP_REQUEST *req = 0;
     int uri_len = strlen((char *)uri);
     req = malloc(sizeof(RTSP_REQUEST));
@@ -669,14 +667,16 @@ RTSP_REQUEST *rtsp_teardown(const unsigned char *uri, int Session)
     return construct_rtsp_request(TEARDOWN, uri, Session, UNICAST, 0);
 }
 
-RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cast, unsigned short server_port, unsigned short client_port,
-                                        int Content_Length, char *content, int options, const RTSP_REQUEST *req)
+RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cast,
+                                        unsigned short server_port, unsigned short client_port,
+                                        int Content_Length, char *content,
+                                        int options, const RTSP_REQUEST *req)
 {
     RTSP_RESPONSE *res = 0;
 
     res = malloc(sizeof(RTSP_RESPONSE));
     if (!res) {
-        return(0);
+        return NULL;
     }
 
     res->code = code;
@@ -688,8 +688,9 @@ RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cas
     res->Content_Length = Content_Length;
     if (Content_Length > 0 && content) {
         res->content = malloc(Content_Length + 1);
-        if (!res->content)
-            return(0);
+        if (!res->content) {
+            return NULL;
+        }
         memcpy(res->content, content, Content_Length);
         res->content[Content_Length] = 0;
     } else {
@@ -699,7 +700,7 @@ RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cas
 
     res->options = options;
 
-    return(res);
+    return res;
 }
 
 RTSP_RESPONSE *rtsp_notfound(RTSP_REQUEST *req)

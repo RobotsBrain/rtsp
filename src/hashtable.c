@@ -161,7 +161,6 @@ static Hashstatus halvehashtable(hashtable **ht)
     return(OK);
 }
 
-/*@null@*/
 hashtable* newhashtable(hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelems)
 {
     hashtable *ht = NULL;
@@ -205,7 +204,6 @@ Hashstatus puthashtable(hashtable **ht, void *key, void *value)
     return(OK);
 }
 
-/*@null@*/
 void* gethashtable(hashtable **ht, void *key)
 {
     unsigned long index;
@@ -220,7 +218,6 @@ void* gethashtable(hashtable **ht, void *key)
     return(NULL);
 }
 
-/*@null@*/
 Hashstatus delhashtable(hashtable **ht, void *key)
 {
     int found;
