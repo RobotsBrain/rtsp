@@ -18,15 +18,15 @@ typedef enum {
 } MEDIA_TYPE;
 
 typedef struct {
-    MEDIA_TYPE type;
-    unsigned short port;
-    unsigned char *uri;
+    MEDIA_TYPE 		type;
+    unsigned short 	port;
+    unsigned char* 	uri;
 } MEDIA;
 
 typedef struct {
-    unsigned char *uri;
-    MEDIA (*medias)[1];
-    int n_medias;
+    unsigned char* 	uri;
+    MEDIA 			(*medias)[1];
+    int 			n_medias;
 } SDP;
 
 int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size);

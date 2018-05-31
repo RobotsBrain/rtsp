@@ -29,7 +29,6 @@ typedef enum {
     TRANSPORT_STR
 } ATTR;
 
-
 typedef enum {
     DESCRIBE = 0,
     PLAY,
@@ -40,24 +39,24 @@ typedef enum {
 } METHOD;
 
 typedef struct {
-    METHOD method;
-    char *uri; /* Memory reserved in unpack_rtsp_req */
-    int CSeq;
-    int Session;
-    TRANSPORT_CAST cast;
-    unsigned short client_port;
+    METHOD          method;
+    char*           uri; /* Memory reserved in unpack_rtsp_req */
+    int             CSeq;
+    int             Session;
+    TRANSPORT_CAST  cast;
+    unsigned short  client_port;
 } RTSP_REQUEST;
 
 typedef struct {
-    int code;
-    int CSeq;
-    int Session;
-    TRANSPORT_CAST cast;
-    unsigned short client_port;
-    unsigned short server_port;
-    int Content_Length;
-    char *content;
-    int options;
+    int             code;
+    int             CSeq;
+    int             Session;
+    TRANSPORT_CAST  cast;
+    unsigned short  client_port;
+    unsigned short  server_port;
+    int             Content_Length;
+    char*           content;
+    int             options;
 } RTSP_RESPONSE;
 
 int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size);
@@ -68,92 +67,37 @@ int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
 
 int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
 
-
-/* Generate request to get description of a media in sdp format
- * uri: Uri of the media
- */
 RTSP_REQUEST *rtsp_describe(const unsigned char *uri);
 
-/* Generate request to setup a media.
- * uri: Uri of the media
- * Session: -1 if there is not session already, the session number otherwise
- * cast: UNICAST (TODO: or MULTICAST)
- * client_port: the port where RTP is listening in the client
- */
 RTSP_REQUEST *rtsp_setup(const unsigned char *uri, int Session, TRANSPORT_CAST cast,
 						unsigned short client_port);
 
-/* Generate request to play a media. Setup must have been called before for this uri
- * uri: Uri of the media
- * Session: Session number. Obligatory
- */
 RTSP_REQUEST *rtsp_play(const unsigned char *uri, int Session);
 
-/* Generate request to pause a media. Setup must have been called before for this uri
- * uri: Uri of the media
- * Session: Session number. Obligatory
- */
 RTSP_REQUEST *rtsp_pause(const unsigned char *uri, int Session);
 
-/* Generate request to teardown a media. Setup must have been called before for this uri
- * uri: Uri of the media
- * Session: Session number. Obligatory
- */
 RTSP_REQUEST *rtsp_teardown(const unsigned char *uri, int Session);
 
-/* Generate not found error
- * req: Request
- */
 RTSP_RESPONSE *rtsp_notfound(RTSP_REQUEST *req);
 
-/* Generate server error
- * req: Request
- */
 RTSP_RESPONSE *rtsp_servererror(RTSP_REQUEST *req);
 
-/* Generate describe response for the request
- * req: Request
- */
 RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req);
 
-/* Generate setup response for req
- * req: Request
- * server_port: Port in the server sending RTP media
- * client_port: Port in the client receiving RTP media
- * cast: UNICAST (TODO: or MULTICAST)
- * Session: Session id
- */
 RTSP_RESPONSE *rtsp_setup_res(RTSP_REQUEST *req, unsigned short server_port,
-								unsigned short client_port, TRANSPORT_CAST cast, int Session);
+								unsigned short client_port, TRANSPORT_CAST cast,
+                                int Session);
 
-/* Generate play response for the request
- * req: Request
- */
 RTSP_RESPONSE *rtsp_play_res(RTSP_REQUEST *req);
 
-/* Generate pause response for the request
- * req: Request
- */
 RTSP_RESPONSE *rtsp_pause_res(RTSP_REQUEST *req);
 
-/* Generate teardown response for the request
- * req: Request
- */
 RTSP_RESPONSE *rtsp_teardown_res(RTSP_REQUEST *req);
 
-/* Generate options response for the request
- * req: Request
- */
 RTSP_RESPONSE *rtsp_options_res(RTSP_REQUEST *req);
 
-/* Free all the memory associated with the RTSP_REQUEST structure
- * req: Request
- */
 void free_rtsp_req(RTSP_REQUEST **req);
 
-/* Free all the memory associated with the RTSP_RESPONSE structure
- * res: Response
- */
 void free_rtsp_res(RTSP_RESPONSE **res);
 
 #ifdef __cplusplus
