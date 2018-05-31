@@ -359,7 +359,7 @@ int main(int argc, char** argv)
         }
     }
     if (res)
-        free_rtsp_res(&res);
+        rtsp_free_response(&res);
     if (req)
         free_rtsp_req(&req);
 
@@ -400,7 +400,7 @@ int main(int argc, char** argv)
         }
     }
     if (res)
-        free_rtsp_res(&res);
+        rtsp_free_response(&res);
     if (req)
         free_rtsp_req(&req);
 
@@ -441,7 +441,7 @@ int main(int argc, char** argv)
         }
     }
     if (res)
-        free_rtsp_res(&res);
+        rtsp_free_response(&res);
     if (req)
         free_rtsp_req(&req);
 
@@ -482,7 +482,7 @@ int main(int argc, char** argv)
         }
     }
     if (res)
-        free_rtsp_res(&res);
+        rtsp_free_response(&res);
     if (req)
         free_rtsp_req(&req);
 
@@ -523,7 +523,7 @@ int main(int argc, char** argv)
         }
     }
     if (res)
-        free_rtsp_res(&res);
+        rtsp_free_response(&res);
     if (req)
         free_rtsp_req(&req);
 
@@ -564,7 +564,7 @@ int main(int argc, char** argv)
         }
     }
     if (res)
-        free_rtsp_res(&res);
+        rtsp_free_response(&res);
     if (req)
         free_rtsp_req(&req);
 
@@ -605,7 +605,7 @@ int main(int argc, char** argv)
         }
     }
     if (res)
-        free_rtsp_res(&res);
+        rtsp_free_response(&res);
     if (req)
         free_rtsp_req(&req);
 

@@ -5,8 +5,11 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 
 THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
+#include <sys/utsname.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "md5.h"
 
 
 
@@ -38,3 +41,111 @@ char *strnstr(const char *s1, const char *s2, size_t n)
     return result;
 }
 
+static unsigned int md_32(unsigned char *string, int length)
+{
+    MD5_CTX context;
+
+    union {
+        char         c[16];
+        unsigned int x[4];
+    } digest;
+
+    unsigned int r = 0;
+  
+    MD5Init(&context);
+    MD5Update(&context, string, length);
+    MD5Final((unsigned char *)&digest, &context);
+
+    for (int i = 0; i < 3; i++) {
+        r ^= digest.x[i];
+    }
+
+    return r;
+}
+
+unsigned int random32(int type)
+{
+    struct {
+        int type;
+        struct timeval tv;
+        clock_t cpu;
+        pid_t pid;
+        int hid;
+        uid_t uid;
+        gid_t gid;
+        struct utsname name;
+    } s;
+
+    gettimeofday(&s.tv, NULL);
+    uname(&s.name);
+    s.type = type;
+    s.cpu = clock();
+    s.pid = getpid();
+    s.hid = gethostid();
+    s.uid = getuid();
+    s.gid = getgid();
+
+    return md_32((unsigned char *)&s, sizeof(s));
+}
+
+unsigned long random_seq()
+{
+    unsigned long seed;
+
+    srand((unsigned)time(NULL));  
+    seed = 1 + (unsigned int)(rand()%(0xFFFF)); 
+    
+    return seed;
+}
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+int create_udp_connect(const char *host, int port, int cliport)
+{
+    int fd, reuse = 1;
+    struct sockaddr_in server, rtp_address;
+    int result = -1;
+    int len = sizeof(struct sockaddr_in);
+
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(fd < 0){
+        // ERROR("socket error!\n");
+        return -1;
+    }
+ 
+    /*set address reuse*/     
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)); 
+ 
+    /*bind local port*/      
+    server.sin_family = AF_INET;         
+    server.sin_addr.s_addr = htonl(INADDR_ANY);              
+    server.sin_port = htons(port);
+
+    if ((bind(fd, (struct sockaddr *)&server, len)) < 0) {               
+        printf("bind rtsp server port error"); 
+        return -1;
+    }
+
+    /*  Name the socket, as agreed with the server.  */
+    rtp_address.sin_family = AF_INET;
+    rtp_address.sin_addr.s_addr = inet_addr(host);
+    rtp_address.sin_port = htons(cliport);
+
+    /*  Now connect our socket to the server's socket.  */
+    result = connect(fd, (struct sockaddr *)&rtp_address, len);
+ 
+    if(result == -1) {
+        printf("connect vrtp socket error\n");
+        return -1;
+    }
+
+    // INFO("host: %s, server port: %d, client port: %d\n", host, port, cliport);
+
+    return fd;
+}

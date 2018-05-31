@@ -5,25 +5,32 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 
 THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
-#ifndef _UTILS_H_
-#define _UTILS_H_
+#ifndef _PARSE_RTP_
+#define _PARSE_RTP_
 
-#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
+typedef struct {
+    unsigned short seq;
+    unsigned int timestamp;
+    unsigned int ssrc;
+} RTP_HEADER;
 
-char *strnstr(const char *s1, const char *s2, size_t n);
 
-unsigned int random32(int type);
+typedef struct {
+    RTP_HEADER header[1];
+    unsigned char *data; /* Reserved memory when parsing */
+    int d_size;
+} RTP_PKG;
 
-unsigned long random_seq();
+
+int pack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size);
 
 
-int create_udp_connect(const char *host, int port, int cliport);
-
+int unpack_rtp(RTP_PKG *pkg, unsigned char *packet, int pkg_max_size);
 
 #ifdef __cplusplus
 }

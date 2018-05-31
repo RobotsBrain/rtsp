@@ -80,7 +80,7 @@ RTSP_REQUEST *rtsp_teardown(const unsigned char *uri, int Session);
 
 RTSP_RESPONSE *rtsp_notfound(RTSP_REQUEST *req);
 
-RTSP_RESPONSE *rtsp_servererror(RTSP_REQUEST *req);
+RTSP_RESPONSE *rtsp_server_error(RTSP_REQUEST *req);
 
 RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req);
 
@@ -98,7 +98,7 @@ RTSP_RESPONSE *rtsp_options_res(RTSP_REQUEST *req);
 
 void free_rtsp_req(RTSP_REQUEST **req);
 
-void free_rtsp_res(RTSP_RESPONSE **res);
+void rtsp_free_response(RTSP_RESPONSE **res);
 
 #ifdef __cplusplus
 }

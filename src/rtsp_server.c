@@ -79,9 +79,9 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
 {
     int i, j, st;
     int global_uri_len;
-    char * end_global_uri;
+    char* end_global_uri = NULL;
     RTSP_RESPONSE *res;
-    int *Session;
+    int *Session = NULL;
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     end_global_uri = strstr(req->uri, "/audio");
@@ -95,9 +95,8 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
 
     global_uri_len = end_global_uri - req->uri;
 
-    if (req->cast == UNICAST) {
-        if (1/* TODO: Check if file exists */) {
-            /* Create new rtsp_info */
+    if(req->cast == UNICAST) {
+        if(1/* TODO: Check if file exists */) {
             if (!rtsp_info) {
                 fprintf(stderr, "Creating new session\n");
                 rtsp_info = malloc(sizeof(INTERNAL_RTSP));
@@ -115,29 +114,30 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
 
             fprintf(stderr, "Getting session: %d\n", req->Session);
             rtsp_info = gethashtable(&prshdl->psess_hash, &(req->Session));
-            /* Check if the session has disappeared for some reason */
-            if (!rtsp_info) {
+            if (!rtsp_info) { /* Check if the session has disappeared for some reason */
                 fprintf(stderr, "caca3\n");
-                return rtsp_servererror(req);
+                return rtsp_server_error(req);
             }
 
             /* Check if the global uri already exists */
-            for (i = 0; i < rtsp_info->n_sources; ++i)
-                if (!memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len))
+            for (i = 0; i < rtsp_info->n_sources; ++i) {
+                if (!memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len)) {
                     break;
+                }
+            }
 
             /* If it doesn't exist create it */
-            if (i == rtsp_info->n_sources) {
+            if(i == rtsp_info->n_sources) {
                 rtsp_info->sources = realloc(rtsp_info->sources, sizeof(INTERNAL_SOURCE) * ++(rtsp_info->n_sources));
                 if (!rtsp_info->sources) {
                     fprintf(stderr, "caca4\n");
-                    return rtsp_servererror(req);
+                    return rtsp_server_error(req);
                 }
                 /* Copy global uri */
                 rtsp_info->sources[i]->global_uri = malloc (global_uri_len + 1);
                 if (!rtsp_info->sources[i]->global_uri) {
                     fprintf(stderr, "caca5\n");
-                    return rtsp_servererror(req);
+                    return rtsp_server_error(req);
                 }
                 memcpy(rtsp_info->sources[i]->global_uri, req->uri, global_uri_len);
                 rtsp_info->sources[i]->global_uri[global_uri_len] = 0;
@@ -146,21 +146,26 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
             }
 
             /* Check if the media uri already exists */
-            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j)
-                if (!memcmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri)))
+            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
+                if (!memcmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri))) {
                     break;
+                }
+            }
+
+            int ser_port = 0;
+
             /* If it doesn't exist create it */
             if (j == rtsp_info->sources[i]->n_medias) {
                 rtsp_info->sources[i]->medias = realloc(rtsp_info->sources[i]->medias, sizeof(INTERNAL_SOURCE) * ++(rtsp_info->sources[i]->n_medias));
                 if (!rtsp_info->sources[i]->n_medias) {
                     fprintf(stderr, "caca6\n");
-                    return rtsp_servererror(req);
+                    return rtsp_server_error(req);
                 }
                 /* Copy global uri */
                 rtsp_info->sources[i]->medias[j]->media_uri = malloc (strlen(req->uri) + 1);
                 if (!rtsp_info->sources[i]->medias[j]->media_uri) { 
                     fprintf(stderr, "caca7\n");
-                    return rtsp_servererror(req);
+                    return rtsp_server_error(req);
                 }
                 memcpy(rtsp_info->sources[i]->medias[j]->media_uri, req->uri, strlen(req->uri));
                 rtsp_info->sources[i]->medias[j]->media_uri[strlen(req->uri)] = 0;
@@ -169,26 +174,26 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
                 ((struct sockaddr_in*)&rtsp_info->client_addr)->sin_port = htons(req->client_port);
 
                 rtsp_info = gethashtable(&prshdl->psess_hash, &(req->Session));
-                /* Check if the session has disappeared for some reason */
-                if (!rtsp_info) {
+                if (!rtsp_info) { /* Check if the session has disappeared for some reason */
                     fprintf(stderr, "caca30\n");
-                    return rtsp_servererror(req);
+                    return rtsp_server_error(req);
                 }
-                /* Assign ssrc */
-                rtsp_info->sources[i]->medias[j]->ssrc = 3333; 
+
+                #define RTP_DEFAULT_PORT 5004
+                rtsp_info->sources[i]->medias[j]->ssrc = random32(0);
+                ser_port = (req->client_port - RTP_DEFAULT_PORT)/2 + RTP_DEFAULT_PORT;
             }
 
-            /* TODO: this */
-            res = rtsp_setup_res(req, 4534, 0, UNICAST, 0);
+            res = rtsp_setup_res(req, ser_port, 0, UNICAST, 0);
             return res;
         } else {
             return rtsp_notfound(req);
         }
-    } else {
-        /* TODO: Multicast */
+    } else {  /* TODO: Multicast */
         fprintf(stderr, "caca8\n");
-        return rtsp_servererror(req);
     }
+
+    return rtsp_server_error(req);
 }
 
 RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *req,
@@ -217,7 +222,7 @@ RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *r
         /* Check if the session has disappeared for some reason */
         if (!rtsp_info) {
             fprintf(stderr, "caca9\n");
-            return rtsp_servererror(req);
+            return rtsp_server_error(req);
         }
 
         /* Get global uri */
@@ -228,7 +233,7 @@ RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *r
         /* If it doesn't exist return error*/
         if (i == rtsp_info->n_sources) {
             fprintf(stderr, "caca10\n");
-            return rtsp_servererror(req);
+            return rtsp_server_error(req);
         }
 
         /* If the uri isn't global */
@@ -242,7 +247,7 @@ RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *r
             /* If it doesn't exist return error */
             if (j == rtsp_info->sources[i]->n_medias) {
                 fprintf(stderr, "caca11\n");
-                return rtsp_servererror(req);
+                return rtsp_server_error(req);
             }
 
             /* Apply to only one media */
@@ -257,7 +262,7 @@ RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *r
 
             if (!st) {
                 fprintf(stderr, "caca13\n");
-                return(rtsp_servererror(req));
+                return(rtsp_server_error(req));
             }
         }
 
@@ -310,7 +315,7 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *re
     if (!rtsp_info) {
         fprintf(stderr, "caca20\n");
         free(res);
-        return rtsp_servererror(req);
+        return rtsp_server_error(req);
     }
     /* Check if the global uri exists */
     for (i = 0; i < rtsp_info->n_sources; ++i) {
@@ -323,7 +328,7 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *re
     if (i == rtsp_info->n_sources) {
         fprintf(stderr, "caca21\n");
         free(res);
-        return rtsp_servererror(req);
+        return rtsp_server_error(req);
     }
 
     if (global_uri) {
@@ -345,7 +350,7 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *re
         if (j == rtsp_info->sources[i]->n_medias) {
             fprintf(stderr, "caca22\n");
             free(res);
-            return rtsp_servererror(req);
+            return rtsp_server_error(req);
         }
         /* Free this media */
         free(rtsp_info->sources[i]->medias[j]->media_uri);
@@ -359,19 +364,18 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *re
     return res;
 }
 
-static int get_session(rtsp_server_worker_s *self, int *ext_session, INTERNAL_RTSP **rtsp_info)
+static void get_session(rtsp_server_worker_s *self, int *ext_session, INTERNAL_RTSP **rtsp_info)
 {
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
-    if (*ext_session > 0) {
-        /* Check that the session truly exists */
+    if(*ext_session > 0) {
         *rtsp_info = gethashtable(&prshdl->psess_hash, ext_session);
         if (*rtsp_info) {
-            return 1;
+            return;
         }
     }
 
-    while (*ext_session < 1) {
+    while(*ext_session < 1) {
         *ext_session = rand();
         *rtsp_info = gethashtable(&prshdl->psess_hash, ext_session);
         if (*rtsp_info) {
@@ -379,10 +383,10 @@ static int get_session(rtsp_server_worker_s *self, int *ext_session, INTERNAL_RT
         }
     }
 
-    return 1;
+    return;
 }
 
-static int receive_message(int sockfd, char * buf, int buf_size)
+static int receive_message(int sockfd, char* buf, int buf_size)
 {
     int ret = 0;
     int read = 0;
@@ -391,43 +395,46 @@ static int receive_message(int sockfd, char * buf, int buf_size)
     size_t tmp_size = 0;
     FILE* f = NULL;
 
+    memset(buf, 0, buf_size);
+
     f = fdopen(sockfd, "r");
 
     do {
         read = getline(&tmp, &tmp_size, f);
-        if (read <= 0) {
+        if(read <= 0) {
             fclose(f);
             free(tmp);
             return -1;
         }
 
-        if (read + ret >= buf_size) {
+        if(read + ret >= buf_size) {
             fclose(f);
             free(tmp);
             return 0;
         }
 
-        if (!content_length && !strncmp(tmp, "Content-Length:", 15)) {
-            if (sscanf(tmp, "Content-Length: %d", &content_length) < 1) {
+        if(!content_length && !strncmp(tmp, "Content-Length:", 15)) {
+            if(sscanf(tmp, "Content-Length: %d", &content_length) < 1) {
                 content_length = 0;
             }
         }
 
-        strcpy(buf + ret, tmp);
+        strncpy(buf + ret, tmp, read);
         ret += read;
     } while(tmp[0] != '\r');
 
-    if (content_length) {
+    if(content_length) {
         content_length += ret;
+
         do {
             read = getline(&tmp, &tmp_size, f);
-            if (read <= 0) {
+            if(read <= 0) {
                 fclose(f);
                 free(tmp);
                 return -1;
             }
 
-            if (read + ret >= buf_size) {
+            if(read + ret >= buf_size) {
                 fclose(f);
                 free(tmp);
                 return 0;
@@ -438,9 +445,10 @@ static int receive_message(int sockfd, char * buf, int buf_size)
         } while(ret < content_length);
     }
 
-    buf[ret] = 0;
     fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
+    
     free(tmp);
+    tmp = NULL;
 
     return ret;
 }
@@ -473,32 +481,32 @@ void *rtsp_server_worker_proc(void *arg)
             }
 
             st = unpack_rtsp_req(req, buf, st);
-            /* If there was an error return err*/
             if (server_error && st) {
                 fprintf(stderr, "caca1\n");
-                res = rtsp_servererror(req);
+                res = rtsp_server_error(req);
                 if (res) {
                     st = pack_rtsp_res(res, buf, REQ_BUFFER);
                     if (st) {
                         buf[st] = 0;
                         send(sockfd, buf, st, 0);
                     }
-                    free_rtsp_res(&res);
+                    rtsp_free_response(&res);
                 }
             } else if (server_error || !st) {
                 memcpy(buf, "RTSP/1.0 500 Internal server error\r\n\r\n", 38);
                 buf[38] = 0;
                 send(sockfd, buf, strlen(buf), 0);
             }
-        } while (server_error || !st);
+        } while(server_error || !st);
         
-        st = get_session(self, &(req->Session), &rtsp_info);
-        
-        if (req->CSeq <= CSeq) {
-            res = rtsp_servererror(req);
+        get_session(self, &(req->Session), &rtsp_info);
+
+        if (req->CSeq <= CSeq || 
+             ((req->method == PLAY || req->method == PAUSE || req->method == TEARDOWN) && rtsp_info == NULL)) {
+            res = rtsp_server_error(req);
         } else {
             CSeq = req->CSeq;
-            switch (req->method) {
+            switch(req->method) {
             case OPTIONS:
                 req->Session = 0;
                 res = rtsp_server_options(self, req);
@@ -514,38 +522,24 @@ void *rtsp_server_worker_proc(void *arg)
                 break;
 
             case PLAY:
-                fprintf(stderr, "Recibido play\n");
-                if (!rtsp_info) {
-                    res = rtsp_servererror(req);
-                } else {
-                    res = rtsp_server_play(self, req);
-                }
+                res = rtsp_server_play(self, req);
                 break;
 
             case PAUSE:
-                if (!rtsp_info) {
-                    res = rtsp_servererror(req);
-                } else {
-                    res = rtsp_server_pause(self, req);
-                }
+                res = rtsp_server_pause(self, req);
                 break;
 
             case TEARDOWN:
-                if (!rtsp_info) {
-                    res = rtsp_servererror(req);
-                } else {
-                    res = rtsp_server_teardown(self, req);
-                }
+                res = rtsp_server_teardown(self, req);
                 break;
 
             default:
-                fprintf(stderr, "caca2\n");
-                res = rtsp_servererror(req);
+                res = rtsp_server_error(req);
                 break;
-            }
-
-            self->ct = time(0);
+            }  
         }
+
+        self->ct = time(0);
 
         if (res) {
             st = pack_rtsp_res(res, buf, REQ_BUFFER);
@@ -553,10 +547,10 @@ void *rtsp_server_worker_proc(void *arg)
                 fprintf(stderr, "\n########################## RESPONSE ##########################\n%s\n", buf);
                 send(sockfd, buf, st, 0);
             }
-            free_rtsp_res(&res);
+            rtsp_free_response(&res);
         }
 
-        if (req->uri) {
+        if(req->uri) {
             free(req->uri);
         }
     }
@@ -564,7 +558,8 @@ void *rtsp_server_worker_proc(void *arg)
     return NULL;
 }
 
-int rtsp_worker_create(rtsp_server_hdl_s* prshdl, int sockfd, struct sockaddr_storage *client_addr)
+int rtsp_worker_create(rtsp_server_hdl_s* prshdl, int sockfd,
+                        struct sockaddr_storage *client_addr)
 {
     int ret = -1;
     int i = 0;

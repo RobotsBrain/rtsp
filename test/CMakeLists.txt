@@ -10,8 +10,8 @@ link_directories(
 
 
 #################################
-add_executable(test_rtp test_rtp.c)
-target_link_libraries(test_rtp rtsp)
+#add_executable(test_rtp test_rtp.c)
+#target_link_libraries(test_rtp rtsp)
 
 
 #################################
