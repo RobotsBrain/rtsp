@@ -194,14 +194,12 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
 RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *req,
                                     RTSP_RESPONSE *(*rtsp_command)(RTSP_REQUEST *))
 {
-    char *end_global_uri;
+    int i, j, st;
     int global_uri_len;
     int global_uri;
     unsigned int ssrc;
-    INTERNAL_RTSP *rtsp_info;
-    int i;
-    int j;
-    int st;
+    char *end_global_uri = NULL;
+    INTERNAL_RTSP *rtsp_info = NULL;
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     global_uri = 0;
@@ -279,14 +277,14 @@ RTSP_RESPONSE *rtsp_server_pause(rtsp_server_worker_s *self, RTSP_REQUEST *req)
     return server_simple_command(self, req, rtsp_pause_res);
 }
 
-RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s *self, RTSP_REQUEST *req)
+RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *req)
 {
     int i, j;
-    INTERNAL_RTSP *rtsp_info;
-    RTSP_RESPONSE *res;
-    char *end_global_uri;
     int global_uri = 0;
-    int global_uri_len;
+    int global_uri_len = 0;
+    char *end_global_uri = NULL;
+    INTERNAL_RTSP *rtsp_info = NULL;
+    RTSP_RESPONSE *res = NULL;
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     res = server_simple_command(self, req, rtsp_teardown_res);
@@ -315,15 +313,19 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s *self, RTSP_REQUEST *re
         return rtsp_servererror(req);
     }
     /* Check if the global uri exists */
-    for (i = 0; i < rtsp_info->n_sources; ++i)
+    for (i = 0; i < rtsp_info->n_sources; ++i) {
         if (strlen(rtsp_info->sources[i]->global_uri) == global_uri_len &&
-                !memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len))
+                !memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len)) {
             break;
+        }      
+    }
+
     if (i == rtsp_info->n_sources) {
         fprintf(stderr, "caca21\n");
         free(res);
         return rtsp_servererror(req);
     }
+
     if (global_uri) {
         /* Delete all medias with this uri */
         for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j)
@@ -352,7 +354,6 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s *self, RTSP_REQUEST *re
         --(rtsp_info->sources[i]->n_medias);
         /* Change size of sources array */
         rtsp_info->sources[i]->medias = realloc(rtsp_info->sources[i]->medias, sizeof(INTERNAL_MEDIA) * rtsp_info->sources[i]->n_medias);
-
     }
 
     return res;
@@ -385,10 +386,10 @@ static int receive_message(int sockfd, char * buf, int buf_size)
 {
     int ret = 0;
     int read = 0;
+    int content_length = 0;
     char* tmp = NULL;
     size_t tmp_size = 0;
-    int content_length = 0;
-    FILE* f = 0;
+    FILE* f = NULL;
 
     f = fdopen(sockfd, "r");
 
@@ -438,7 +439,7 @@ static int receive_message(int sockfd, char * buf, int buf_size)
     }
 
     buf[ret] = 0;
-    fprintf(stderr, "\n\n########################## RECEIVED ##########################\n%s", buf);
+    fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
     free(tmp);
 
     return ret;
@@ -448,15 +449,14 @@ void *rtsp_server_worker_proc(void *arg)
 {
     rtsp_server_worker_s* self = (rtsp_server_worker_s*)arg;
     int sockfd = self->sockfd;
-    char buf[REQ_BUFFER];
-    int ret;
-    int st;
-    RTSP_REQUEST req[1];
-    RTSP_RESPONSE *res;
+    int ret, st;
+    int CSeq = 0;
     int server_error;
     int Session;
+    char buf[REQ_BUFFER] = {0};
+    RTSP_REQUEST req[1];
+    RTSP_RESPONSE *res = NULL;
     INTERNAL_RTSP *rtsp_info = NULL;
-    int CSeq = 0;
 
     for(;;) {
         rtsp_info = 0;
