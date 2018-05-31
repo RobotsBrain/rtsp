@@ -29,10 +29,6 @@ void UDP_disconnect(int sockfd);
 #define RTP_BUFFER_SIZE 512
 
 
-/* Receive a message with a final empty line and possibly content
- * returns: 0 on bad message, -1 on closed socket, message length if ok */
-int receive_message(int sockfd, char *buf, int buf_size);
-
 /* Get the host and the path of an RTSP uri
  * uri: Pointer to the null terminated string with the uri
  * host: Pointer to the null terminated string with the host. MUST be freed. null if it doesn't exist
@@ -48,22 +44,6 @@ int extract_uri(char *uri, char **host, char **path);
  */
 int bind_UDP_ports(int *rtp_sockfd, int *rtcp_sockfd);
 
-
-/* Prototype for the function that creates workers
- * 1st parameter: Int where the socket will be passed
- * 2nd parameter: Structure with information of the client
- */
-typedef int (*WORKER_CREATOR)(int, struct sockaddr_storage*);
-
-/* Server loop that accepts requests y creates workers
- * port: Port where the server is listening
- * sockfd: Variable to save the socket
- * my_addr: Variable to save the server address
- * create_worker: Function that creates the new worker
- * return: 0 if error
- */
-int accept_tcp_requests(unsigned short port, int *sockfd, unsigned int *my_addr,
-						WORKER_CREATOR create_worker);
 
 #ifdef __cplusplus
 }

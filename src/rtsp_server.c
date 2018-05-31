@@ -14,7 +14,6 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <netdb.h>
 #include <pthread.h>
 
-#include "network.h"
 #include "hashtable.h"
 #include "rtsp.h"
 #include "rtsp_server.h"
@@ -22,6 +21,8 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 #define REQ_BUFFER          4096
 #define MAX_RTSP_WORKERS    20 /* Number of processes listening for rtsp connections */
+#define MAX_QUEUE_SIZE      20
+
 
 typedef struct {
     unsigned char *media_uri; /* Uri for the media */
@@ -383,6 +384,67 @@ int get_session(int *ext_session, INTERNAL_RTSP **rtsp_info)
     return 1;
 }
 
+static int receive_message(int sockfd, char * buf, int buf_size)
+{
+    int ret = 0;
+    int read = 0;
+    char * tmp = 0;
+    size_t tmp_size = 0;
+    int content_length = 0;
+    FILE * f = 0;
+
+    f = fdopen(sockfd, "r");
+
+    do {
+        read = getline(&tmp, &tmp_size, f);
+        if (read <= 0) {
+            fclose(f);
+            free(tmp);
+            return(-1);
+        }
+
+        if (read+ret >= buf_size) {
+            fclose(f);
+            free(tmp);
+            return(0);
+        }
+
+        if (!content_length && !strncmp(tmp, "Content-Length:", 15))
+            if (sscanf(tmp, "Content-Length: %d", &content_length) < 1)
+                content_length = 0;
+
+        strcpy(buf+ret, tmp);
+        ret += read;
+    } while (tmp[0] != '\r');
+
+    if (content_length) {
+        content_length += ret;
+        do {
+            read = getline(&tmp, &tmp_size, f);
+            if (read <= 0) {
+                fclose(f);
+                free(tmp);
+                return(-1);
+            }
+
+            if (read+ret >= buf_size) {
+                fclose(f);
+                free(tmp);
+                return(0);
+            }
+
+            memcpy(buf+ret, tmp, read);
+            ret += read;
+        } while (ret < content_length);
+    }
+
+    buf[ret] = 0;
+    fprintf(stderr, "\n\n########################## RECEIVED ##########################\n%s", buf);
+    free(tmp);
+
+    return ret;
+}
+
 void *rtsp_worker_fun(void *arg)
 {
     WORKER *self = arg;
@@ -540,6 +602,64 @@ int rtsp_worker_create(int tmp_sockfd, struct sockaddr_storage *client_addr)
     return ret;
 }
 
+int accept_tcp_requests(unsigned short port, int *sockfd, unsigned int *my_addr)
+{
+    int st;
+    struct addrinfo hints, *res;
+    char port_str[6];
+    int tmp_sockfd;
+    struct sockaddr_storage client_addr;
+    unsigned int client_addr_len = sizeof(client_addr);
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+
+    if (!snprintf(port_str, 5, "%d", port)) {
+        return -1;
+    }
+
+    if (getaddrinfo(0, port_str, &hints, &res)) {
+        return -1;
+    }
+
+    *sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (*sockfd == -1) {
+        return -1;
+    }
+
+    st = bind(*sockfd, res->ai_addr, res->ai_addrlen);
+    /* Copy server address to my_addr */
+    if(my_addr != NULL) {
+        *my_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
+    }
+    freeaddrinfo(res);
+    if (st == -1) {
+        *sockfd = -1;
+        return -1;
+    }
+
+    st = listen(*sockfd, MAX_QUEUE_SIZE);
+    if (st == -1) {
+        return -1;
+    }
+
+    for (;;) {
+        tmp_sockfd = accept(*sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (tmp_sockfd == -1) {
+            return -1;
+        }
+
+        st = rtsp_worker_create(tmp_sockfd, &client_addr);
+        if(st < 0) {
+            close(tmp_sockfd);
+        }
+    }
+
+    return 0;
+}
+
 int rtsp_server(unsigned short port)
 {
     int i;
@@ -559,7 +679,7 @@ int rtsp_server(unsigned short port)
         return 0;
     }
 
-    accept_tcp_requests(port, &sockfd, NULL, rtsp_worker_create);
+    accept_tcp_requests(port, &sockfd, NULL);
 
     return 0;
 }
