@@ -25,47 +25,47 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 
 typedef struct {
-    unsigned char *media_uri; /* Uri for the media */
-    unsigned int ssrc; /* Use the ssrc to locate the corresponding RTP session */
+    unsigned char*  media_uri; /* Uri for the media */
+    unsigned int    ssrc; /* Use the ssrc to locate the corresponding RTP session */
 } INTERNAL_MEDIA;
 
 typedef struct {
-    unsigned char *global_uri; /* Global control uri */
-    INTERNAL_MEDIA (*medias)[1];
-    int n_medias;
+    unsigned char*  global_uri; /* Global control uri */
+    INTERNAL_MEDIA  (*medias)[1];
+    int             n_medias;
 } INTERNAL_SOURCE;
 
 typedef struct {
-    int Session;
-    int CSeq;
+    int                     Session;
+    int                     CSeq;
+    int                     n_sources;
+    INTERNAL_SOURCE         (*sources)[1];
     struct sockaddr_storage client_addr;
-    INTERNAL_SOURCE (*sources)[1];
-    int n_sources;
 } INTERNAL_RTSP;
 
-typedef struct {
+typedef struct rtsp_server_worker_ {
     int         used;
     int         sockfd;
     time_t      ct;
     pthread_t   tid;
     struct sockaddr_storage client_addr;
     void*       pcontext;
-} WORKER;
+} rtsp_server_worker_s;
 
 typedef struct rtsp_server_hdl_ {
-    unsigned short  port;
-    pthread_t       rstid;
-    hashtable*      psess_hash;
-    WORKER          workers[MAX_RTSP_WORKERS];
+    unsigned short          port;
+    pthread_t               rstid;
+    hashtable*              psess_hash;
+    rtsp_server_worker_s    workers[MAX_RTSP_WORKERS];
 } rtsp_server_hdl_s;
 
 
-RTSP_RESPONSE *rtsp_server_options(WORKER *self, RTSP_REQUEST *req)
+RTSP_RESPONSE *rtsp_server_options(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     return rtsp_options_res(req);
 }
 
-RTSP_RESPONSE *rtsp_server_describe(WORKER *self, RTSP_REQUEST *req)
+RTSP_RESPONSE *rtsp_server_describe(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     if (1/* TODO: Check if file exists */) {
         return rtsp_describe_res(req);
@@ -74,7 +74,7 @@ RTSP_RESPONSE *rtsp_server_describe(WORKER *self, RTSP_REQUEST *req)
     }
 }
 
-RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
+RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
                                 INTERNAL_RTSP *rtsp_info)
 {
     int i, j, st;
@@ -191,7 +191,7 @@ RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
     }
 }
 
-RTSP_RESPONSE *server_simple_command(WORKER *self, RTSP_REQUEST *req,
+RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *req,
                                     RTSP_RESPONSE *(*rtsp_command)(RTSP_REQUEST *))
 {
     char *end_global_uri;
@@ -269,17 +269,17 @@ RTSP_RESPONSE *server_simple_command(WORKER *self, RTSP_REQUEST *req,
     }
 }
 
-RTSP_RESPONSE *rtsp_server_play(WORKER *self, RTSP_REQUEST *req)
+RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     return server_simple_command(self, req, rtsp_play_res);
 }
 
-RTSP_RESPONSE *rtsp_server_pause(WORKER *self, RTSP_REQUEST *req)
+RTSP_RESPONSE *rtsp_server_pause(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     return server_simple_command(self, req, rtsp_pause_res);
 }
 
-RTSP_RESPONSE *rtsp_server_teardown(WORKER *self, RTSP_REQUEST *req)
+RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     int i, j;
     INTERNAL_RTSP *rtsp_info;
@@ -358,7 +358,7 @@ RTSP_RESPONSE *rtsp_server_teardown(WORKER *self, RTSP_REQUEST *req)
     return res;
 }
 
-static int get_session(WORKER *self, int *ext_session, INTERNAL_RTSP **rtsp_info)
+static int get_session(rtsp_server_worker_s *self, int *ext_session, INTERNAL_RTSP **rtsp_info)
 {
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
@@ -446,7 +446,7 @@ static int receive_message(int sockfd, char * buf, int buf_size)
 
 void *rtsp_server_worker_proc(void *arg)
 {
-    WORKER *self = (WORKER *)arg;
+    rtsp_server_worker_s* self = (rtsp_server_worker_s*)arg;
     int sockfd = self->sockfd;
     char buf[REQ_BUFFER];
     int ret;
@@ -580,7 +580,7 @@ int rtsp_worker_create(rtsp_server_hdl_s* prshdl, int sockfd, struct sockaddr_st
             break;
         }
 
-        memset(&prshdl->workers[i], 0, sizeof(WORKER));
+        memset(&prshdl->workers[i], 0, sizeof(rtsp_server_worker_s));
 
         prshdl->workers[i].sockfd = sockfd;
         prshdl->workers[i].ct = time(0);
