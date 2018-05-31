@@ -236,9 +236,11 @@ RTSP_RESPONSE *server_simple_command(WORKER *self, RTSP_REQUEST *req,
         /* If the uri isn't global */
         if (!global_uri) {
             /* Get the media uri */
-            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j)
-                if (!memcmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri)))
+            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
+                if (!memcmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri))) {
                     break;
+                }
+            }
             /* If it doesn't exist return error */
             if (j == rtsp_info->sources[i]->n_medias) {
                 fprintf(stderr, "caca11\n");
@@ -356,7 +358,6 @@ RTSP_RESPONSE *rtsp_server_teardown(WORKER *self, RTSP_REQUEST *req)
     return res;
 }
 
-/* Checks if a session already exists. If it doesn't, create one */
 static int get_session(WORKER *self, int *ext_session, INTERNAL_RTSP **rtsp_info)
 {
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
@@ -443,7 +444,7 @@ static int receive_message(int sockfd, char * buf, int buf_size)
     return ret;
 }
 
-void *rtsp_worker_fun(void *arg)
+void *rtsp_server_worker_proc(void *arg)
 {
     WORKER *self = (WORKER *)arg;
     int sockfd = self->sockfd;
@@ -454,7 +455,7 @@ void *rtsp_worker_fun(void *arg)
     RTSP_RESPONSE *res;
     int server_error;
     int Session;
-    INTERNAL_RTSP *rtsp_info = 0;
+    INTERNAL_RTSP *rtsp_info = NULL;
     int CSeq = 0;
 
     for(;;) {
@@ -491,8 +492,8 @@ void *rtsp_worker_fun(void *arg)
             }
         } while (server_error || !st);
         
-        st = get_session(self, &(req->Session), &rtsp_info);  /* Get or create session */
-        /* Check that CSeq is incrementing */
+        st = get_session(self, &(req->Session), &rtsp_info);
+        
         if (req->CSeq <= CSeq) {
             res = rtsp_servererror(req);
         } else {
@@ -549,9 +550,7 @@ void *rtsp_worker_fun(void *arg)
         if (res) {
             st = pack_rtsp_res(res, buf, REQ_BUFFER);
             if (st) {
-                fprintf(stderr, "\n########################## RESPONSE ##########################\n");
-                buf[st] = 0;
-                write(2, buf, st);
+                fprintf(stderr, "\n########################## RESPONSE ##########################\n%s\n", buf);
                 send(sockfd, buf, st, 0);
             }
             free_rtsp_res(&res);
@@ -589,7 +588,7 @@ int rtsp_worker_create(rtsp_server_hdl_s* prshdl, int sockfd, struct sockaddr_st
 
         memcpy(&(prshdl->workers[i].client_addr), client_addr, sizeof(struct sockaddr_storage));
 
-        ret = pthread_create(&prshdl->workers[i].tid, 0, rtsp_worker_fun, &prshdl->workers[i]);
+        ret = pthread_create(&prshdl->workers[i].tid, 0, rtsp_server_worker_proc, &prshdl->workers[i]);
         if(ret) {
             break;
         }
