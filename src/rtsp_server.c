@@ -46,20 +46,17 @@ typedef struct {
 typedef struct {
     int         used;
     int         sockfd;
-    time_t      time_contacted;
-    pthread_t   thread_id;
+    time_t      ct;
+    pthread_t   tid;
     struct sockaddr_storage client_addr;
     void*       pcontext;
 } WORKER;
-
-
-WORKER workers[MAX_RTSP_WORKERS][1];
-hashtable *session_hash;
 
 typedef struct rtsp_server_hdl_ {
     unsigned short  port;
     pthread_t       rstid;
     hashtable*      psess_hash;
+    WORKER          workers[MAX_RTSP_WORKERS];
 } rtsp_server_hdl_s;
 
 
@@ -85,6 +82,7 @@ RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
     char * end_global_uri;
     RTSP_RESPONSE *res;
     int *Session;
+    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     end_global_uri = strstr(req->uri, "/audio");
     if (!end_global_uri) {
@@ -112,11 +110,11 @@ RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
 
                 Session = malloc(sizeof(unsigned int));
                 *Session = req->Session;
-                st = puthashtable(&session_hash, Session, rtsp_info);
+                st = puthashtable(&prshdl->psess_hash, Session, rtsp_info);
             }
 
             fprintf(stderr, "Getting session: %d\n", req->Session);
-            rtsp_info = gethashtable(&session_hash, &(req->Session));
+            rtsp_info = gethashtable(&prshdl->psess_hash, &(req->Session));
             /* Check if the session has disappeared for some reason */
             if (!rtsp_info) {
                 fprintf(stderr, "caca3\n");
@@ -170,7 +168,7 @@ RTSP_RESPONSE *rtsp_server_setup(WORKER *self, RTSP_REQUEST *req,
                 /* Put the client udp port in the structure */
                 ((struct sockaddr_in*)&rtsp_info->client_addr)->sin_port = htons(req->client_port);
 
-                rtsp_info = gethashtable(&session_hash, &(req->Session));
+                rtsp_info = gethashtable(&prshdl->psess_hash, &(req->Session));
                 /* Check if the session has disappeared for some reason */
                 if (!rtsp_info) {
                     fprintf(stderr, "caca30\n");
@@ -204,6 +202,7 @@ RTSP_RESPONSE *server_simple_command(WORKER *self, RTSP_REQUEST *req,
     int i;
     int j;
     int st;
+    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     global_uri = 0;
     end_global_uri = strstr(req->uri, "/audio");
@@ -216,7 +215,7 @@ RTSP_RESPONSE *server_simple_command(WORKER *self, RTSP_REQUEST *req,
     global_uri_len = end_global_uri - req->uri;
 
     if (1/* TODO: Check if file exists */) {
-        rtsp_info = gethashtable(&session_hash, &req->Session);
+        rtsp_info = gethashtable(&prshdl->psess_hash, &req->Session);
         /* Check if the session has disappeared for some reason */
         if (!rtsp_info) {
             fprintf(stderr, "caca9\n");
@@ -286,6 +285,7 @@ RTSP_RESPONSE *rtsp_server_teardown(WORKER *self, RTSP_REQUEST *req)
     char *end_global_uri;
     int global_uri = 0;
     int global_uri_len;
+    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     res = server_simple_command(self, req, rtsp_teardown_res);
 
@@ -306,7 +306,7 @@ RTSP_RESPONSE *rtsp_server_teardown(WORKER *self, RTSP_REQUEST *req)
         global_uri_len = end_global_uri - req->uri;
     }
 
-    rtsp_info = gethashtable(&session_hash, &(req->Session));
+    rtsp_info = gethashtable(&prshdl->psess_hash, &(req->Session));
     if (!rtsp_info) {
         fprintf(stderr, "caca20\n");
         free(res);
@@ -357,11 +357,13 @@ RTSP_RESPONSE *rtsp_server_teardown(WORKER *self, RTSP_REQUEST *req)
 }
 
 /* Checks if a session already exists. If it doesn't, create one */
-static int get_session(int *ext_session, INTERNAL_RTSP **rtsp_info)
+static int get_session(WORKER *self, int *ext_session, INTERNAL_RTSP **rtsp_info)
 {
+    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
+
     if (*ext_session > 0) {
         /* Check that the session truly exists */
-        *rtsp_info = gethashtable(&session_hash, ext_session);
+        *rtsp_info = gethashtable(&prshdl->psess_hash, ext_session);
         if (*rtsp_info) {
             return 1;
         }
@@ -369,7 +371,7 @@ static int get_session(int *ext_session, INTERNAL_RTSP **rtsp_info)
 
     while (*ext_session < 1) {
         *ext_session = rand();
-        *rtsp_info = gethashtable(&session_hash, ext_session);
+        *rtsp_info = gethashtable(&prshdl->psess_hash, ext_session);
         if (*rtsp_info) {
             *ext_session = -1;
         }
@@ -443,8 +445,8 @@ static int receive_message(int sockfd, char * buf, int buf_size)
 
 void *rtsp_worker_fun(void *arg)
 {
-    WORKER *self = arg;
-    int sockfd;
+    WORKER *self = (WORKER *)arg;
+    int sockfd = self->sockfd;
     char buf[REQ_BUFFER];
     int ret;
     int st;
@@ -455,12 +457,10 @@ void *rtsp_worker_fun(void *arg)
     INTERNAL_RTSP *rtsp_info = 0;
     int CSeq = 0;
 
-    sockfd = self->sockfd;
-
     for(;;) {
         rtsp_info = 0;
         Session = -1;
-        /* Wait to get a correct request */
+
         do {
             server_error = 0;
 
@@ -491,7 +491,7 @@ void *rtsp_worker_fun(void *arg)
             }
         } while (server_error || !st);
         
-        st = get_session(&(req->Session), &rtsp_info);  /* Get or create session */
+        st = get_session(self, &(req->Session), &rtsp_info);  /* Get or create session */
         /* Check that CSeq is incrementing */
         if (req->CSeq <= CSeq) {
             res = rtsp_servererror(req);
@@ -543,7 +543,7 @@ void *rtsp_worker_fun(void *arg)
                 break;
             }
 
-            self->time_contacted = time(0);
+            self->ct = time(0);
         }
 
         if (res) {
@@ -565,15 +565,14 @@ void *rtsp_worker_fun(void *arg)
     return NULL;
 }
 
-int rtsp_worker_create(int sockfd, struct sockaddr_storage *client_addr)
+int rtsp_worker_create(rtsp_server_hdl_s* prshdl, int sockfd, struct sockaddr_storage *client_addr)
 {
     int ret = -1;
     int i = 0;
-    int st = -1;
 
     do {
         for(i = 0; i < MAX_RTSP_WORKERS; ++i) {
-            if (!workers[i]->used) {
+            if (prshdl->workers[i].used == 0) {
                 break;
             }       
         }
@@ -582,20 +581,20 @@ int rtsp_worker_create(int sockfd, struct sockaddr_storage *client_addr)
             break;
         }
 
-        memset(workers[i], 0, sizeof(WORKER));
+        memset(&prshdl->workers[i], 0, sizeof(WORKER));
 
-        workers[i]->sockfd = sockfd;
-        workers[i]->time_contacted = time(0);
+        prshdl->workers[i].sockfd = sockfd;
+        prshdl->workers[i].ct = time(0);
+        prshdl->workers[i].pcontext = prshdl;
 
-        memcpy(&(workers[i]->client_addr), client_addr, sizeof(struct sockaddr_storage));
+        memcpy(&(prshdl->workers[i].client_addr), client_addr, sizeof(struct sockaddr_storage));
 
-        st = pthread_create(&workers[i]->thread_id, 0, rtsp_worker_fun, &workers[i]);
-        if (st) {
+        ret = pthread_create(&prshdl->workers[i].tid, 0, rtsp_worker_fun, &prshdl->workers[i]);
+        if(ret) {
             break;
         }
 
-        workers[i]->used = 1;
-
+        prshdl->workers[i].used = 1;
         ret = 0;
     } while(0);
 
@@ -641,7 +640,7 @@ void *rtsp_server_proc(void *arg)
             return NULL;
         }
 
-        st = rtsp_worker_create(cli_sockfd, &client_addr);
+        st = rtsp_worker_create(prshdl, cli_sockfd, &client_addr);
         if(st < 0) {
             close(cli_sockfd);
         }
@@ -669,14 +668,6 @@ int rtsp_server_start(void** pphdl, unsigned short port)
         free(prshdl);
         return -1;
     }
-
-    /************** for temp ****************/
-    session_hash = newhashtable(longhash, longequal, MAX_RTSP_WORKERS * 2, 1);
-
-    for (int i = 0; i < MAX_RTSP_WORKERS; ++i) {
-        workers[i]->used = 0;
-    }
-    /************** for temp ****************/
 
     prshdl->port = port;
 
