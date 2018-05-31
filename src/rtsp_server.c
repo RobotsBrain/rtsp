@@ -16,6 +16,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 #include "hashtable.h"
 #include "rtsp.h"
+#include "rtp.h"
 #include "rtsp_server.h"
 
 
@@ -25,12 +26,15 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 
 typedef struct {
-    unsigned char*  media_uri; /* Uri for the media */
-    unsigned int    ssrc; /* Use the ssrc to locate the corresponding RTP session */
+    unsigned char*  media_uri;  /* Uri for the media */
+    unsigned int    ssrc;       /* Use the ssrc to locate the corresponding RTP session */
+    unsigned short  client_port;
+    unsigned short  server_port;
+    void*           prtphdl;
 } INTERNAL_MEDIA;
 
 typedef struct {
-    unsigned char*  global_uri; /* Global control uri */
+    unsigned char*  global_uri;     /* Global control uri */
     INTERNAL_MEDIA  (*medias)[1];
     int             n_medias;
 } INTERNAL_SOURCE;
@@ -85,11 +89,11 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     end_global_uri = strstr(req->uri, "/audio");
-    if (!end_global_uri) {
+    if(end_global_uri == NULL) {
         end_global_uri = strstr(req->uri, "/video");
     }
 
-    if (!end_global_uri) {
+    if(end_global_uri == NULL) {
         return rtsp_notfound(req);
     }
 
@@ -141,7 +145,7 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
                 }
                 memcpy(rtsp_info->sources[i]->global_uri, req->uri, global_uri_len);
                 rtsp_info->sources[i]->global_uri[global_uri_len] = 0;
-                rtsp_info->sources[i]->medias = 0;
+                rtsp_info->sources[i]->medias = NULL;
                 rtsp_info->sources[i]->n_medias = 0;
             }
 
@@ -151,8 +155,6 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
                     break;
                 }
             }
-
-            int ser_port = 0;
 
             /* If it doesn't exist create it */
             if (j == rtsp_info->sources[i]->n_medias) {
@@ -179,12 +181,14 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
                     return rtsp_server_error(req);
                 }
 
-                #define RTP_DEFAULT_PORT 5004
                 rtsp_info->sources[i]->medias[j]->ssrc = random32(0);
-                ser_port = (req->client_port - RTP_DEFAULT_PORT)/2 + RTP_DEFAULT_PORT;
+
+printf("~~~afafa~~~~~~~~~~~~~~~~~~~~~~~~~~~ %d\n", rtsp_info->sources[i]->medias[j]->ssrc);
+                rtsp_info->sources[i]->medias[j]->client_port = req->client_port;
+                rtsp_info->sources[i]->medias[j]->server_port = req->client_port + 2000;
             }
 
-            res = rtsp_setup_res(req, ser_port, 0, UNICAST, 0);
+            res = rtsp_setup_res(req, rtsp_info->sources[i]->medias[j]->server_port, 0, UNICAST, 0);
             return res;
         } else {
             return rtsp_notfound(req);
@@ -265,7 +269,7 @@ RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *r
 
             if (!st) {
                 fprintf(stderr, "caca13\n");
-                return(rtsp_server_error(req));
+                return rtsp_server_error(req);
             }
         }
 
@@ -277,7 +281,83 @@ RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *r
 
 RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
-    return server_simple_command(self, req, rtsp_play_res);
+    int i, j, st;
+    int global_uri_len;
+    int global_uri = 0;
+    unsigned int ssrc;
+    char *end_global_uri = NULL;
+    INTERNAL_RTSP *rtsp_info = NULL;
+    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
+
+    end_global_uri = strstr(req->uri, "/audio");
+    if (end_global_uri == NULL) {
+        end_global_uri = strstr(req->uri, "/video");
+    }
+
+    if (end_global_uri == NULL) {
+        end_global_uri = req->uri + strlen(req->uri);
+        global_uri = 1;
+    }
+
+    global_uri_len = end_global_uri - req->uri;
+
+    if (1/* TODO: Check if file exists */) {
+        rtsp_info = gethashtable(&prshdl->psess_hash, &req->Session);
+        /* Check if the session has disappeared for some reason */
+        if (!rtsp_info) {
+            fprintf(stderr, "caca9\n");
+            return rtsp_server_error(req);
+        }
+
+        /* Get global uri */
+        for (i = 0; i < rtsp_info->n_sources; ++i) {
+            if (!memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len)) {
+                break;
+            }
+        }
+
+        /* If it doesn't exist return error*/
+        if (i == rtsp_info->n_sources) {
+            fprintf(stderr, "caca10\n");
+            return rtsp_server_error(req);
+        }
+
+        if (!global_uri) {  /* If the uri isn't global */
+            /* Get the media uri */
+            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
+                if (!memcmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri))) {
+                    break;
+                }
+            }
+            /* If it doesn't exist return error */
+            if (j == rtsp_info->sources[i]->n_medias) {
+                fprintf(stderr, "caca11\n");
+                return rtsp_server_error(req);
+            }
+        } else {
+            /* Apply to all the medias in the global uri */
+            fprintf(stderr, "medias: %d\n", rtsp_info->sources[i]->n_medias);
+            st = 1;
+            printf("~~~~~~~~~~~~~~~~~~~~~~~~~~ %s\n", req->uri);
+            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
+
+                if(strstr(rtsp_info->sources[i]->medias[j]->media_uri, "video"))
+                rtp_start(&rtsp_info->sources[i]->medias[j]->prtphdl, rtsp_info->sources[i]->medias[j]->server_port,
+                      rtsp_info->sources[i]->medias[j]->client_port, rtsp_info->sources[i]->medias[j]->ssrc);
+            }
+
+            if (!st) {
+                fprintf(stderr, "caca13\n");
+                return rtsp_server_error(req);
+            }
+        }
+
+        return rtsp_play_res(req);
+    } else {
+        return rtsp_notfound(req);
+    }
+
+    // return server_simple_command(self, req, rtsp_play_res);
 }
 
 RTSP_RESPONSE *rtsp_server_pause(rtsp_server_worker_s *self, RTSP_REQUEST *req)
@@ -336,10 +416,13 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *re
 
     if (global_uri) {
         /* Delete all medias with this uri */
-        for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j)
+        for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
             free(rtsp_info->sources[i]->medias[j]->media_uri);
+        }
+
         /* Free medias array */
         free(rtsp_info->sources[i]->medias);
+
         /* Move the other sources */
         memmove(&(rtsp_info->sources[i]), &(rtsp_info->sources[i+1]), rtsp_info->n_sources - i - 1);
         (--rtsp_info->n_sources);
@@ -347,19 +430,25 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *re
         rtsp_info->sources = realloc(rtsp_info->sources, sizeof(INTERNAL_SOURCE) * rtsp_info->n_sources);
     } else {
         /* Check if the media uri exists */
-        for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j)
-            if (!strncmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri)))
+        for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
+            if (!strncmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri))) {
                 break;
+            }
+        }
+
         if (j == rtsp_info->sources[i]->n_medias) {
             fprintf(stderr, "caca22\n");
             free(res);
             return rtsp_server_error(req);
         }
+
         /* Free this media */
         free(rtsp_info->sources[i]->medias[j]->media_uri);
+
         /* Move the other medias */
         memmove(&(rtsp_info->sources[i]->medias[j]), &(rtsp_info->sources[i]->medias[j+1]), rtsp_info->sources[i]->n_medias - j - 1);
         --(rtsp_info->sources[i]->n_medias);
+
         /* Change size of sources array */
         rtsp_info->sources[i]->medias = realloc(rtsp_info->sources[i]->medias, sizeof(INTERNAL_MEDIA) * rtsp_info->sources[i]->n_medias);
     }
@@ -448,10 +537,11 @@ static int receive_message(int sockfd, char* buf, int buf_size)
         } while(ret < content_length);
     }
 
-    fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
-    
-    free(tmp);
-    tmp = NULL;
+    if(tmp != NULL) {
+        fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
+        free(tmp);
+        tmp = NULL;
+    }
 
     return ret;
 }
@@ -476,13 +566,14 @@ void *rtsp_server_worker_proc(void *arg)
         do {
             server_error = 0;
 
-            st = receive_message(sockfd, buf, REQ_BUFFER);
+            // st = receive_message(sockfd, buf, REQ_BUFFER);
+            st = read(sockfd, buf, REQ_BUFFER);
             if (st == -1) {
                 return 0;
             } else if (!st) {
                 server_error = 1;
             }
-
+fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
             st = unpack_rtsp_req(req, buf, st);
             if (server_error && st) {
                 fprintf(stderr, "caca1\n");

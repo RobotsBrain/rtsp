@@ -64,6 +64,16 @@ typedef struct {
 	unsigned int ssrc;					/* stream number is used here. */
 } RTP_header;
 
+typedef struct rtp_handle_ {
+	int 			sockfd;
+	int 			serport;
+	int 			cliport;
+	int 			ssrc;
+	unsigned long 	seq;
+	unsigned int 	timestamp;
+	pthread_t 		tid;
+	unsigned char  	nalu_buffer[1448];
+} rtp_handle_s;
 
 int abstr_nalu_indic(unsigned char *buf, int buf_size, int *be_found)
 {
@@ -107,8 +117,7 @@ int abstr_nalu_indic(unsigned char *buf, int buf_size, int *be_found)
 	return frame_size;
 }
 
-#if 0
-int BuildRtpHeader(RTP_header *r)
+int rtp_build_header(rtp_handle_s* prphdl, RTP_header *r)
 {	
 	r->version = 2;
 	r->padding = 0;
@@ -116,13 +125,13 @@ int BuildRtpHeader(RTP_header *r)
 	r->csrc_len = 0;
 	r->marker = 0;
 	r->payload = 96;
-	r->seq_no = htons(m_seq);
+	r->seq_no = htons(prphdl->seq);
 
 	int frame_rate_step = 3600;
 
-	m_timestamp += frame_rate_step;
-	r->timestamp = htonl(m_timestamp);
-	r->ssrc = htonl(m_ssrc);
+	prphdl->timestamp += frame_rate_step;
+	r->timestamp = htonl(prphdl->timestamp);
+	r->ssrc = htonl(prphdl->ssrc);
 
 	return 0;
 }
@@ -154,31 +163,31 @@ int BuildRtpHeader(RTP_header *r)
  *            R: 1 bit, Reserved
  *            Type: 5 bits, Same with NALU Header's Type.
  ******************************************************************************/
-int BuildRtpNalu(unsigned char *inbuffer, int frame_size)
+int rtp_build_nalu(rtp_handle_s* prphdl, unsigned char *inbuffer, int frame_size)
 {
 	unsigned char nalu_header;
 	unsigned char fu_indic;
 	unsigned char fu_header;	
 	unsigned char *p_nalu_data;
-	unsigned char *buffer = m_nalu_buffer;
+	unsigned char *buffer = prphdl->nalu_buffer;
 	int time_delay;
 	int data_left;
 	int fu_start = 1;
 	int fu_end   = 0;
 	RTP_header rtp_header;
 	
-	BuildRtpHeader(&rtp_header);
+	rtp_build_header(prphdl, &rtp_header);
 	
 	data_left   = frame_size - NALU_INDIC_SIZE;
 	p_nalu_data = inbuffer + NALU_INDIC_SIZE;
 
 	//Single RTP Packet.
     if(data_left <= SINGLE_NALU_DATA_MAX) {
-	    rtp_header.seq_no = htons(m_seq++);
+	    rtp_header.seq_no = htons(prphdl->seq++);
 	    rtp_header.marker = 1;    
 		memcpy(buffer, &rtp_header, sizeof(rtp_header));
         memcpy(buffer + RTP_HEADER_SIZE, p_nalu_data, data_left);
-        write(m_serfd, m_nalu_buffer, data_left + RTP_HEADER_SIZE);
+        write(prphdl->sockfd, prphdl->nalu_buffer, data_left + RTP_HEADER_SIZE);
 		usleep(DE_TIME);
         return 0;
     }
@@ -201,12 +210,12 @@ int BuildRtpNalu(unsigned char *inbuffer, int frame_size)
 			fu_header |= 0x40;
 		}
 
-        rtp_header.seq_no = htons(m_seq++);
+        rtp_header.seq_no = htons(prphdl->seq++);
 		memcpy(buffer, &rtp_header, sizeof(rtp_header));
 		memcpy(buffer + 14, p_nalu_data, proc_size);
 		buffer[12] = fu_indic;
 		buffer[13] = fu_header;
-		write(m_serfd, m_nalu_buffer, rtp_size);
+		write(prphdl->sockfd, prphdl->nalu_buffer, rtp_size);
 		if(fu_end) {
 			usleep(36000);
 		}
@@ -219,17 +228,22 @@ int BuildRtpNalu(unsigned char *inbuffer, int frame_size)
 	return 0;	
 }
 
-int Start(int port, int cliport, int ssrc)
+long GetFileSize(FILE *infile)
 {
-	m_serfd = CreateUdpConnect("127.0.0.1", port, cliport);
+    long size_of_file;
 
-	m_ssrc = ssrc;
-	m_timestamp = timestamp;
-	m_seq = seq;
+    fseek(infile, 0L, SEEK_END);
+
+	size_of_file = ftell(infile);
+
+    fseek(infile, 0L, SEEK_SET);
+
+	return size_of_file;
 }
 
-void EventHandleLoop()
+void* rtp_worker_proc(void* arg)
 {
+	rtp_handle_s* prphdl = (rtp_handle_s*)arg;
 	FILE *infile = NULL;
 	int total_size = 0, bytes_consumed = 0, frame_size = 0, bytes_left;
 	unsigned char inbufs[READ_LEN] = "", outbufs[READ_LEN] = "";;
@@ -237,16 +251,21 @@ void EventHandleLoop()
 	int found_nalu = 0;
 	int reach_last_nalu = 0;
 
+	prphdl->sockfd = create_udp_connect("127.0.0.1", prphdl->serport, prphdl->cliport);
+
+	printf("[%s, %d] ~~~~~~~~~~~~~~~~~~~~~~~~(%d, %d)\n",
+			__FUNCTION__, __LINE__, prphdl->serport, prphdl->cliport);
+
 	infile = fopen("1.h264", "rb");
 	if(infile == NULL) {
 		printf("please check media file\n");
-		return;
+		return NULL;
 	}
 	
 	total_size = GetFileSize(infile);
 	if(total_size <= 4) {
 		fclose(infile);
-	    return;	
+	    return NULL;	
 	}
 
 	while(1) {
@@ -260,28 +279,64 @@ void EventHandleLoop()
 			if(found_nalu || reach_last_nalu) {	      
 			    memcpy(outbufs, p_tmp, frame_size);
 
-				BuildRtpNalu(outbufs, frame_size);		 
+				rtp_build_nalu(prphdl, outbufs, frame_size);		 
 				p_tmp += frame_size;
 				bytes_consumed += frame_size;
 
-				// if(reach_last_nalu)
+				// if(reach_last_nalu) {
 				//  	rtsp[cur_conn_num]->is_runing = 0;
+				// }
 			}
 
 			bytes_left -= frame_size;
 		}
 	 
 	    fseek(infile, bytes_consumed, SEEK_SET);
-
-		if(WaitForSleep(10) < 0) {
-			break;
-		}
 	}
 
 	fclose(infile);
-	close(m_serfd);
+	close(prphdl->sockfd);
 
-	return;
+	printf("[%s, %d] ~~~~~~~~~~~~~~~~~~~~~~~~\n", __FUNCTION__, __LINE__);
+
+	return NULL;
 }
 
-#endif
+int rtp_start(void **pphdl, int serport, int cliport, int ssrc)
+{
+	rtp_handle_s* prphdl = NULL;
+
+	prphdl = (rtp_handle_s*)malloc(sizeof(rtp_handle_s));
+	if(prphdl == NULL) {
+		return -1;
+	}
+
+	prphdl->serport = serport;
+	prphdl->cliport = cliport;
+	prphdl->seq = random_seq();
+	prphdl->ssrc = random32(0);
+	prphdl->timestamp = random32(0);
+
+	pthread_create(&prphdl->tid, 0, rtp_worker_proc, prphdl);
+
+	*pphdl = prphdl;
+
+	return 0;
+}
+
+int rtp_stop(void **pphdl)
+{
+	rtp_handle_s* prphdl = (rtp_handle_s*)*pphdl;
+
+	if(prphdl == NULL) {
+		return -1;
+	}
+
+	close(prphdl->sockfd);
+
+	free(prphdl);
+	prphdl = NULL;
+
+	return 0;
+}
+

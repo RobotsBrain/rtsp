@@ -70,9 +70,12 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
     int i;
     int attr = -1;
     int attr_len;
+
     attr_len = strcspn(tok_start, ":");
-    if (attr_len == text_size || attr_len == 0)
-        return(0);
+    if (attr_len == text_size || attr_len == 0) {
+        return 0;
+    }
+
     /* Discover attribute */
     for (i = 0; i < N_ATTR; ++i) {
         if (!memcmp(ATTR_STR[i], tok_start, attr_len)) {
@@ -83,12 +86,14 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
     tok_start += attr_len;
     text_size -= attr_len - 1;
     /* Ignore spaces after ':' */
-    while (*(++tok_start) == ' ')
+    while (*(++tok_start) == ' ') {
         --text_size;
+    }
 
     attr_len = strcspn(tok_start, "\r\n");
-    if (attr_len == text_size || attr_len == 0)
-        return(0);
+    if (attr_len == text_size || attr_len == 0) {
+        return 0;
+    }
 
     switch (attr) {
     case ACCEPT_STR:
@@ -400,16 +405,17 @@ static int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size)
                 return(0);
             tok_start += strlen(SERVER_PORT_STR);
             res->server_port = (unsigned short)atoi(tok_start);
-            if (res->server_port == 0)
-                return(0);
+            if (res->server_port == 0) {
+                return 0;
+            }
         }
         break;
 
     default:
-        return(1);
+        return 1;
     }
 
-    return(1);
+    return 1;
 }
 
 int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
@@ -593,7 +599,7 @@ int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
     /* Write client and server ports*/
     if (res->client_port && res->server_port) {
         ret = snprintf(res_text + written, text_size - written, \
-            "Transport: RTP/AVP;%s;client_port=%d-%d;server_port=%d-%d\r\n", \
+            "Transport: RTP/AVP;%s;client_port=%d-%d;server_port=%d-%d;ssrc=3320614242;ttl=32\r\n", \
             CAST_STR[res->cast], res->client_port, res->client_port + 1, \
             res->server_port, res->server_port + 1);
         if (ret < 0 || ret >= text_size - written) {
@@ -736,21 +742,24 @@ RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req)
     int uri_len = strlen(req->uri);
     char sdp_str[1024];
     int sdp_len;
-    RTSP_RESPONSE *ret;
-    /* Hardcoded medias */
+    RTSP_RESPONSE *ret = NULL;
+
     if (strstr(req->uri, "audio") || strstr(req->uri, "video"))
-        return(0);
+        return NULL;
+
     sdp.n_medias = 2;
     sdp.uri = (unsigned char *)req->uri;
     sdp.medias = malloc(sizeof(MEDIA) * 2);
-    if (!sdp.medias)
-        return(0);
+    if (!sdp.medias) {
+        return NULL;
+    }
+
     sdp.medias[0]->type = AUDIO;
     sdp.medias[0]->port = 0;
     sdp.medias[0]->uri = malloc(uri_len + 8);
     if (!sdp.medias[0]->uri) {
         free(sdp.medias);
-        return(0);
+        return NULL;
     }
     memcpy(sdp.medias[0]->uri, req->uri, uri_len);
     memcpy(sdp.medias[0]->uri + uri_len, "/audio", 7);
@@ -762,7 +771,7 @@ RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req)
     if (!sdp.medias[1]->uri) {
         free(sdp.medias[0]->uri);
         free(sdp.medias);
-        return(0);
+        return NULL;
     }
     memcpy(sdp.medias[1]->uri, req->uri, uri_len);
     memcpy(sdp.medias[1]->uri + uri_len, "/video", 7);
@@ -774,12 +783,14 @@ RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req)
         free(sdp.medias);
         return(0);
     }
+
     ret = construct_rtsp_response(200, -1, 0, 0, 0, sdp_len, sdp_str, 0, req);
+
     free(sdp.medias[0]->uri);
     free(sdp.medias[1]->uri);
     free(sdp.medias);
 
-    return(ret);
+    return ret;
 }
 
 /* server_port and server_port + 1 must be used for this uri/session */

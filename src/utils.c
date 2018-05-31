@@ -6,7 +6,12 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 #include <sys/utsname.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "md5.h"
@@ -98,14 +103,6 @@ unsigned long random_seq()
     return seed;
 }
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
 int create_udp_connect(const char *host, int port, int cliport)
 {
     int fd, reuse = 1;
@@ -115,7 +112,6 @@ int create_udp_connect(const char *host, int port, int cliport)
 
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(fd < 0){
-        // ERROR("socket error!\n");
         return -1;
     }
  
@@ -127,7 +123,7 @@ int create_udp_connect(const char *host, int port, int cliport)
     server.sin_addr.s_addr = htonl(INADDR_ANY);              
     server.sin_port = htons(port);
 
-    if ((bind(fd, (struct sockaddr *)&server, len)) < 0) {               
+    if((bind(fd, (struct sockaddr *)&server, len)) < 0) {               
         printf("bind rtsp server port error"); 
         return -1;
     }
@@ -139,13 +135,12 @@ int create_udp_connect(const char *host, int port, int cliport)
 
     /*  Now connect our socket to the server's socket.  */
     result = connect(fd, (struct sockaddr *)&rtp_address, len);
- 
     if(result == -1) {
         printf("connect vrtp socket error\n");
         return -1;
     }
 
-    // INFO("host: %s, server port: %d, client port: %d\n", host, port, cliport);
+    printf("host: %s, server port: %d, client port: %d\n", host, port, cliport);
 
     return fd;
 }
