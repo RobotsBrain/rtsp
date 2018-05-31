@@ -201,20 +201,22 @@ RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *r
 {
     int i, j, st;
     int global_uri_len;
-    int global_uri;
+    int global_uri = 0;
     unsigned int ssrc;
     char *end_global_uri = NULL;
     INTERNAL_RTSP *rtsp_info = NULL;
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
-    global_uri = 0;
     end_global_uri = strstr(req->uri, "/audio");
-    if (!end_global_uri)
+    if (end_global_uri == NULL) {
         end_global_uri = strstr(req->uri, "/video");
-    if (!end_global_uri) {
+    }
+
+    if (end_global_uri == NULL) {
         end_global_uri = req->uri + strlen(req->uri);
         global_uri = 1;
     }
+
     global_uri_len = end_global_uri - req->uri;
 
     if (1/* TODO: Check if file exists */) {
@@ -226,9 +228,11 @@ RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *r
         }
 
         /* Get global uri */
-        for (i = 0; i < rtsp_info->n_sources; ++i)
-            if (!memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len))
+        for (i = 0; i < rtsp_info->n_sources; ++i) {
+            if (!memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len)) {
                 break;
+            }
+        }
 
         /* If it doesn't exist return error*/
         if (i == rtsp_info->n_sources) {
@@ -236,8 +240,7 @@ RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *r
             return rtsp_server_error(req);
         }
 
-        /* If the uri isn't global */
-        if (!global_uri) {
+        if (!global_uri) {  /* If the uri isn't global */
             /* Get the media uri */
             for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
                 if (!memcmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri))) {
