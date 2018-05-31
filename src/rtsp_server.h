@@ -12,7 +12,12 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 extern "C" {
 #endif /* __cplusplus */
 
-int rtsp_server(unsigned short port);
+
+int rtsp_server_start(void** pphdl, unsigned short port);
+
+
+int rtsp_server_stop(void** pphdl);
+
 
 #ifdef __cplusplus
 }

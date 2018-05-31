@@ -26,9 +26,26 @@ int main(int argc, char **argv)
         }
     }
 
-    rtsp_server(port);
+    int ret = -1;
+    void* phdl = NULL;
 
-    return(0);
+    ret = rtsp_server_start(&phdl, port);
+    if(ret < 0) {
+        printf("start rtsp server fail!\n");
+        return -1;
+    }
+
+    while(1) {
+        sleep(5);
+    }
+
+    rtsp_server_stop(&phdl);
+    if(ret < 0) {
+        printf("stop rtsp server fail!\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 // ffplay rtsp://127.0.0.1:8554 -v debug
