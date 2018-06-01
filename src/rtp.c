@@ -77,14 +77,11 @@ typedef struct rtp_handle_ {
 
 int abstr_nalu_indic(unsigned char *buf, int buf_size, int *be_found)
 {
-    unsigned char *p_tmp;
-	int offset;
-	int frame_size;
-	
+	int offset = 0;
+	int frame_size = 4;
+    unsigned char *p_tmp = buf + 4;
+
 	*be_found = 0;
-	offset = 0;
-	frame_size = 4;	
-	p_tmp = buf + 4;
 	
 	while(frame_size < buf_size - 4) {
 	    if(p_tmp[2]) {
@@ -167,7 +164,7 @@ int rtp_build_nalu(rtp_handle_s* prphdl, unsigned char *inbuffer, int frame_size
 {
 	unsigned char nalu_header;
 	unsigned char fu_indic;
-	unsigned char fu_header;	
+	unsigned char fu_header;
 	unsigned char *p_nalu_data;
 	unsigned char *buffer = prphdl->nalu_buffer;
 	int time_delay;
@@ -246,7 +243,7 @@ void* rtp_worker_proc(void* arg)
 	rtp_handle_s* prphdl = (rtp_handle_s*)arg;
 	FILE *infile = NULL;
 	int total_size = 0, bytes_consumed = 0, frame_size = 0, bytes_left;
-	unsigned char inbufs[READ_LEN] = "", outbufs[READ_LEN] = "";;
+	unsigned char inbufs[READ_LEN] = {0}, outbufs[READ_LEN] = {0};
     unsigned char *p_tmp = NULL;
 	int found_nalu = 0;
 	int reach_last_nalu = 0;
@@ -313,9 +310,9 @@ int rtp_start(void **pphdl, int serport, int cliport, int ssrc)
 
 	prphdl->serport = serport;
 	prphdl->cliport = cliport;
-	prphdl->seq = random_seq();
+	prphdl->seq = 0;//random_seq();
 	prphdl->ssrc = random32(0);
-	prphdl->timestamp = random32(0);
+	prphdl->timestamp = -3600;//random32(0);
 
 	pthread_create(&prphdl->tid, 0, rtp_worker_proc, prphdl);
 

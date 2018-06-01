@@ -114,11 +114,9 @@ int create_udp_connect(const char *host, int port, int cliport)
     if(fd < 0){
         return -1;
     }
- 
-    /*set address reuse*/     
+
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)); 
- 
-    /*bind local port*/      
+  
     server.sin_family = AF_INET;         
     server.sin_addr.s_addr = htonl(INADDR_ANY);              
     server.sin_port = htons(port);
@@ -128,12 +126,10 @@ int create_udp_connect(const char *host, int port, int cliport)
         return -1;
     }
 
-    /*  Name the socket, as agreed with the server.  */
     rtp_address.sin_family = AF_INET;
     rtp_address.sin_addr.s_addr = inet_addr(host);
     rtp_address.sin_port = htons(cliport);
 
-    /*  Now connect our socket to the server's socket.  */
     result = connect(fd, (struct sockaddr *)&rtp_address, len);
     if(result == -1) {
         printf("connect vrtp socket error\n");

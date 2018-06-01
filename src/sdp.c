@@ -41,6 +41,10 @@ int pack_sdp(SDP *sdp, unsigned char *sdp_text, int sdp_max_size)
 
     /* Write each media */
     for(i = 0; i < sdp->n_medias; ++i) {
+        if(sdp->medias[i]->type == 96)
+             ret = snprintf((char *)sdp_text + written, sdp_max_size, "m=video %d RTP/AVP %d\r\n",
+                        sdp->medias[i]->port, sdp->medias[i]->type);
+        else
         ret = snprintf((char *)sdp_text + written, sdp_max_size, "m=%s %d RTP/AVP %d\r\n",
                         MEDIA_TYPE_STR[sdp->medias[i]->type], sdp->medias[i]->port, sdp->medias[i]->type);
         if (ret < 0 || ret + written >= sdp_max_size) {

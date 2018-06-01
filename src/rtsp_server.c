@@ -183,9 +183,9 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
 
                 rtsp_info->sources[i]->medias[j]->ssrc = random32(0);
 
-printf("~~~afafa~~~~~~~~~~~~~~~~~~~~~~~~~~~ %d\n", rtsp_info->sources[i]->medias[j]->ssrc);
+                printf("~~~~~~~~~~ ssrc: %ld\n", rtsp_info->sources[i]->medias[j]->ssrc);
                 rtsp_info->sources[i]->medias[j]->client_port = req->client_port;
-                rtsp_info->sources[i]->medias[j]->server_port = req->client_port + 2000;
+                rtsp_info->sources[i]->medias[j]->server_port = req->client_port + 1000;
             }
 
             res = rtsp_setup_res(req, rtsp_info->sources[i]->medias[j]->server_port, 0, UNICAST, 0);
@@ -565,6 +565,8 @@ void *rtsp_server_worker_proc(void *arg)
 
         do {
             server_error = 0;
+
+            memset(buf, 0, REQ_BUFFER);
 
             // st = receive_message(sockfd, buf, REQ_BUFFER);
             st = read(sockfd, buf, REQ_BUFFER);
