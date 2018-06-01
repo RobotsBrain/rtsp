@@ -15,13 +15,13 @@ link_directories(
 
 
 #################################
-add_executable(test_sdp test_sdp.c)
-target_link_libraries(test_sdp rtsp)
+#add_executable(test_sdp test_sdp.c)
+#target_link_libraries(test_sdp rtsp)
 
 
 #################################
-add_executable(test_rtsp test_rtsp.c)
-target_link_libraries(test_rtsp rtsp)
+#add_executable(test_rtsp test_rtsp.c)
+#target_link_libraries(test_rtsp rtsp)
 
 
 #################################

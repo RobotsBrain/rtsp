@@ -220,3 +220,74 @@ int rtp_send_teardown(char *uri, unsigned int ssrc)
 
     return send_to_rtp(&teardown_msg);
 }
+
+
+static int receive_message(int sockfd, char* buf, int buf_size)
+{
+    int ret = 0;
+    int read = 0;
+    int content_length = 0;
+    char* tmp = NULL;
+    size_t tmp_size = 0;
+    FILE* f = NULL;
+
+    memset(buf, 0, buf_size);
+
+    f = fdopen(sockfd, "r");
+
+    do {
+        read = getline(&tmp, &tmp_size, f);
+        if(read <= 0) {
+            fclose(f);
+            free(tmp);
+            return -1;
+        }
+
+        if(read + ret >= buf_size) {
+            fclose(f);
+            free(tmp);
+            return 0;
+        }
+
+        if(!content_length && !strncmp(tmp, "Content-Length:", 15)) {
+            if(sscanf(tmp, "Content-Length: %d", &content_length) < 1) {
+                content_length = 0;
+            }
+        }
+
+        strncpy(buf + ret, tmp, read);
+        ret += read;
+    } while(tmp[0] != '\r');
+
+    if(content_length) {
+        content_length += ret;
+
+        do {
+            read = getline(&tmp, &tmp_size, f);
+            if(read <= 0) {
+                fclose(f);
+                free(tmp);
+                return -1;
+            }
+
+            if(read + ret >= buf_size) {
+                fclose(f);
+                free(tmp);
+                return 0;
+            }
+
+            memcpy(buf + ret, tmp, read);
+            ret += read;
+        } while(ret < content_length);
+    }
+
+    if(tmp != NULL) {
+        fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
+        free(tmp);
+        tmp = NULL;
+    }
+
+    return ret;
+}
+
+

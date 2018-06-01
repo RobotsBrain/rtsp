@@ -25,6 +25,9 @@ unsigned long random_seq();
 int create_udp_connect(const char *host, int port, int cliport);
 
 
+int create_tcp_server(const char *host, int port);
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -140,3 +140,42 @@ int create_udp_connect(const char *host, int port, int cliport)
 
     return fd;
 }
+
+#define MAX_QUEUE_SIZE      20
+
+int create_tcp_server(const char *host, int port)
+{
+    int ret = -1;
+    int sockfd = -1;
+    struct sockaddr_in servAddr;
+
+    printf("port: %d\n", port);
+
+    memset(&servAddr, 0, sizeof(struct sockaddr_in));
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if(sockfd < 0) {
+        perror("cannot open socket ");
+        return -1;
+    }
+ 
+    servAddr.sin_family = AF_INET;
+    servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servAddr.sin_port = htons(port);
+     
+    ret = bind(sockfd, (struct sockaddr *)&servAddr, sizeof(servAddr));
+    if(ret < 0) {
+        close(sockfd);
+        perror("cannot bind port ");
+        return -1;
+    }
+
+    ret = listen(sockfd, MAX_QUEUE_SIZE);
+    if(ret < 0) {
+        close(sockfd);
+        return -1;
+    }
+
+    return sockfd;
+}
+

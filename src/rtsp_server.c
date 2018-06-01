@@ -22,8 +22,6 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 #define REQ_BUFFER          4096
 #define MAX_RTSP_WORKERS    20 /* Number of processes listening for rtsp connections */
-#define MAX_QUEUE_SIZE      20
-
 
 typedef struct {
     unsigned char*  media_uri;  /* Uri for the media */
@@ -50,7 +48,6 @@ typedef struct {
 typedef struct rtsp_server_worker_ {
     int         used;
     int         sockfd;
-    time_t      ct;
     pthread_t   tid;
     struct sockaddr_storage client_addr;
     void*       pcontext;
@@ -356,8 +353,6 @@ RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
     } else {
         return rtsp_notfound(req);
     }
-
-    // return server_simple_command(self, req, rtsp_play_res);
 }
 
 RTSP_RESPONSE *rtsp_server_pause(rtsp_server_worker_s *self, RTSP_REQUEST *req)
@@ -468,6 +463,7 @@ static void get_session(rtsp_server_worker_s *self, int *ext_session, INTERNAL_R
     }
 
     while(*ext_session < 1) {
+        srand(time(0));
         *ext_session = rand();
         *rtsp_info = gethashtable(&prshdl->psess_hash, ext_session);
         if (*rtsp_info) {
@@ -476,74 +472,6 @@ static void get_session(rtsp_server_worker_s *self, int *ext_session, INTERNAL_R
     }
 
     return;
-}
-
-static int receive_message(int sockfd, char* buf, int buf_size)
-{
-    int ret = 0;
-    int read = 0;
-    int content_length = 0;
-    char* tmp = NULL;
-    size_t tmp_size = 0;
-    FILE* f = NULL;
-
-    memset(buf, 0, buf_size);
-
-    f = fdopen(sockfd, "r");
-
-    do {
-        read = getline(&tmp, &tmp_size, f);
-        if(read <= 0) {
-            fclose(f);
-            free(tmp);
-            return -1;
-        }
-
-        if(read + ret >= buf_size) {
-            fclose(f);
-            free(tmp);
-            return 0;
-        }
-
-        if(!content_length && !strncmp(tmp, "Content-Length:", 15)) {
-            if(sscanf(tmp, "Content-Length: %d", &content_length) < 1) {
-                content_length = 0;
-            }
-        }
-
-        strncpy(buf + ret, tmp, read);
-        ret += read;
-    } while(tmp[0] != '\r');
-
-    if(content_length) {
-        content_length += ret;
-
-        do {
-            read = getline(&tmp, &tmp_size, f);
-            if(read <= 0) {
-                fclose(f);
-                free(tmp);
-                return -1;
-            }
-
-            if(read + ret >= buf_size) {
-                fclose(f);
-                free(tmp);
-                return 0;
-            }
-
-            memcpy(buf + ret, tmp, read);
-            ret += read;
-        } while(ret < content_length);
-    }
-
-    if(tmp != NULL) {
-        fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
-        free(tmp);
-        tmp = NULL;
-    }
-
-    return ret;
 }
 
 void *rtsp_server_worker_proc(void *arg)
@@ -560,7 +488,7 @@ void *rtsp_server_worker_proc(void *arg)
     INTERNAL_RTSP *rtsp_info = NULL;
 
     for(;;) {
-        rtsp_info = 0;
+        rtsp_info = NULL;
         Session = -1;
 
         do {
@@ -568,7 +496,6 @@ void *rtsp_server_worker_proc(void *arg)
 
             memset(buf, 0, REQ_BUFFER);
 
-            // st = receive_message(sockfd, buf, REQ_BUFFER);
             st = read(sockfd, buf, REQ_BUFFER);
             if (st == -1) {
                 return 0;
@@ -581,7 +508,7 @@ fprintf(stderr, "\n########################## RECEIVED #########################
                 fprintf(stderr, "caca1\n");
                 res = rtsp_server_error(req);
                 if (res) {
-                    st = pack_rtsp_res(res, buf, REQ_BUFFER);
+                    st = rtsp_pack_response(res, buf, REQ_BUFFER);
                     if (st) {
                         buf[st] = 0;
                         send(sockfd, buf, st, 0);
@@ -635,10 +562,8 @@ fprintf(stderr, "\n########################## RECEIVED #########################
             }  
         }
 
-        self->ct = time(0);
-
-        if (res) {
-            st = pack_rtsp_res(res, buf, REQ_BUFFER);
+        if(res) {
+            st = rtsp_pack_response(res, buf, REQ_BUFFER);
             if (st) {
                 fprintf(stderr, "\n########################## RESPONSE ##########################\n%s\n", buf);
                 send(sockfd, buf, st, 0);
@@ -663,24 +588,26 @@ int rtsp_worker_create(rtsp_server_hdl_s* prshdl, int sockfd,
     do {
         for(i = 0; i < MAX_RTSP_WORKERS; ++i) {
             if (prshdl->workers[i].used == 0) {
+                printf("find a free worker(%d) to do...\n", i);
                 break;
             }       
         }
 
         if(i >= MAX_RTSP_WORKERS) {
+            printf("can not find!\n");
             break;
         }
 
         memset(&prshdl->workers[i], 0, sizeof(rtsp_server_worker_s));
 
         prshdl->workers[i].sockfd = sockfd;
-        prshdl->workers[i].ct = time(0);
         prshdl->workers[i].pcontext = prshdl;
 
         memcpy(&(prshdl->workers[i].client_addr), client_addr, sizeof(struct sockaddr_storage));
 
         ret = pthread_create(&prshdl->workers[i].tid, 0, rtsp_server_worker_proc, &prshdl->workers[i]);
-        if(ret) {
+        if(ret != 0) {
+            printf("create thread fail!\n");
             break;
         }
 
@@ -693,46 +620,29 @@ int rtsp_worker_create(rtsp_server_hdl_s* prshdl, int sockfd,
 
 void *rtsp_server_proc(void *arg)
 {
-    int st;
-    int sockfd = -1;
-    int cli_sockfd;
-    struct sockaddr_in servAddr;
+    int ret = -1;
+    int sockfd = -1, cli_sockfd = -1;
     struct sockaddr_storage client_addr;
     unsigned int client_addr_len = sizeof(client_addr);
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)arg;
-    unsigned short port = prshdl->port;
 
-    printf("port: %d\n", prshdl->port);
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    sockfd = create_tcp_server(NULL, prshdl->port);
     if(sockfd < 0) {
-        perror("cannot open socket ");
-        return NULL;
-    }
- 
-    servAddr.sin_family = AF_INET;
-    servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servAddr.sin_port = htons(port);
-     
-    if(bind(sockfd, (struct sockaddr *)&servAddr, sizeof(servAddr)) < 0) {
-        perror("cannot bind port ");
-        return NULL;
-    }
-
-    st = listen(sockfd, MAX_QUEUE_SIZE);
-    if (st == -1) {
         return NULL;
     }
 
     for (;;) {
+        memset(&client_addr, 0, sizeof(struct sockaddr_storage));
+
         cli_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
         if (cli_sockfd == -1) {
-            return NULL;
+            break;
         }
 
-        st = rtsp_worker_create(prshdl, cli_sockfd, &client_addr);
-        if(st < 0) {
+        ret = rtsp_worker_create(prshdl, cli_sockfd, &client_addr);
+        if(ret < 0) {
             close(cli_sockfd);
+            cli_sockfd = -1;
         }
     }
 
@@ -744,6 +654,7 @@ void *rtsp_server_proc(void *arg)
 
 int rtsp_server_start(void** pphdl, unsigned short port)
 {
+    int ret = -1;
     rtsp_server_hdl_s* prshdl = NULL;
 
     prshdl = (rtsp_server_hdl_s*)malloc(sizeof(rtsp_server_hdl_s));
@@ -761,9 +672,12 @@ int rtsp_server_start(void** pphdl, unsigned short port)
 
     prshdl->port = port;
 
-    pthread_create(&prshdl->rstid, 0, rtsp_server_proc, prshdl);
-
-    srand(time(0));
+    ret = pthread_create(&prshdl->rstid, 0, rtsp_server_proc, prshdl);
+    if(ret != 0) {
+        printf("create rtsp server thread fail!\n");
+        free(prshdl);
+        return -1;
+    }
 
     *pphdl = prshdl;
 

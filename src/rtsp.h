@@ -65,7 +65,7 @@ int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size);
 
 int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
 
-int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
+int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size);
 
 RTSP_REQUEST *rtsp_describe(const unsigned char *uri);
 

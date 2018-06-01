@@ -64,6 +64,7 @@ void clearhashtable(hashtable **ht)
     cell *curcell = NULL;
 
     curcell = (*ht)->cells + (*ht)->size;
+
     if ((*ht)->freeelems) {
         while (curcell-- != (*ht)->cells) {
             if (curcell->key) {
@@ -75,6 +76,7 @@ void clearhashtable(hashtable **ht)
     } else {
         bzero((*ht)->cells, sizeof(cell) * (*ht)->size);
     }
+
     (*ht)->nelems = 0;
 
     return;
@@ -128,24 +130,30 @@ static Hashstatus halvehashtable(hashtable **ht)
     hashtable *newht;
     unsigned long newsize;
     Hashstatus st;
+
     /* The size cannot be less than minsize
        If size is equal to minsize do nothing
        If size is less than minsize, set size to minsize */
     if ((*ht)->size == (*ht)->minsize) {
         return(MINSIZE);
     }
+
     newsize = (*ht)->size / 2;
     if (newsize < (*ht)->minsize)
         newsize = (*ht)->minsize;
+
     if (newsize % 2 == 0)
         newsize++;
+
     if ( (newht = newhashtable ((*ht)->calchash, (*ht)->equalkeys, newsize, (*ht)->freeelems)) == NULL)
         return(ERR);
+
     newht->minsize = (*ht)->minsize;
     if ( (st = transfercells (&newht, ht))  != OK ) {
         freehashtable (&newht);
         return(st);
     }
+
     freehashtable (ht);
     *ht = newht;
 
@@ -186,12 +194,16 @@ Hashstatus puthashtable(hashtable **ht, void *key, void *value)
     cell *curcell;
     index = (*ht)->calchash (key) % (*ht)->size;
     curcell = &((*ht)->cells[index]);
+
     /* Find an empty slot to insert the key and value
        If the key already exists, the value is overwritten */
     while (curcell->key &&
-            !(*ht)->equalkeys (key, curcell->key))
-        if (++curcell == (*ht)->cells + (*ht)->size)
+            !(*ht)->equalkeys (key, curcell->key)) {
+        if (++curcell == (*ht)->cells + (*ht)->size) {
             curcell = (*ht)->cells;
+        }
+    }
+
     curcell->key = key;
     curcell->value = value;
 
@@ -205,6 +217,7 @@ Hashstatus puthashtable(hashtable **ht, void *key, void *value)
 void* gethashtable(hashtable **ht, void *key)
 {
     unsigned long index;
+
     index = (*ht)->calchash (key) % (*ht)->size;
     /* Search the occupied slots for a match with the key */
     while ((*ht)->cells[index].key) {

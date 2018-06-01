@@ -544,7 +544,7 @@ int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
     return(1);
 }
 
-int pack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
+int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size)
 {
     int ret;
     int written;

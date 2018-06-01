@@ -385,7 +385,7 @@ int main(int argc, char** argv)
                     err = 1;
                     fprintf(stderr, "Error creating setup unicast without session respose: rtsp://uri/cacosa\n");
                 } else {
-                    st = pack_rtsp_res(res, packed_msg, 1024);
+                    st = rtsp_pack_response(res, packed_msg, 1024);
                     if (!st) {
                         err = 1;
                         fprintf(stderr, "Error packing setup unicast without session response:\n%s\n", msg_ok[1]);
@@ -426,7 +426,7 @@ int main(int argc, char** argv)
                     err = 1;
                     fprintf(stderr, "Error creating setup multicast without session respose: rtsp://uri/cacosa\n");
                 } else {
-                    st = pack_rtsp_res(res, packed_msg, 1024);
+                    st = rtsp_pack_response(res, packed_msg, 1024);
                     if (!st) {
                         err = 1;
                         fprintf(stderr, "Error packing setup multicast without session response:\n%s\n", msg_ok[2]);
