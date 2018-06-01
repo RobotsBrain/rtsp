@@ -15,10 +15,10 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 
 /* A cell is free when key = NULL */
-struct _cell {
+typedef struct _cell {
     void *key;
     void *value;
-};
+} cell;
 
 /* Open addressing hashtable implementation
    The size of the table is doubled when nelems/size > 0.75
@@ -36,23 +36,6 @@ struct _hashtable {
     cell *cells;
     short freeelems;
 };
-
-// unsigned long stringhash(unsigned char *str)
-// {
-//     unsigned long hash = 5381;
-//     int c;
-
-//     while ( (c = *str++) ) {
-//         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-//     }
-
-//     return(hash);
-// }
-
-// int stringequal(void *a, void *b)
-// {
-//     return(!strcmp ((char *)a, (char *)b));
-// }
 
 unsigned long longhash(void *n)
 {
@@ -78,15 +61,17 @@ void freehashtable(hashtable **ht)
 
 void clearhashtable(hashtable **ht)
 {
-    cell *curcell;
+    cell *curcell = NULL;
+
     curcell = (*ht)->cells + (*ht)->size;
     if ((*ht)->freeelems) {
-        while (curcell-- != (*ht)->cells)
+        while (curcell-- != (*ht)->cells) {
             if (curcell->key) {
                 free (curcell->key);
                 free (curcell->value);
                 curcell->key = NULL;
             }
+        }    
     } else {
         bzero((*ht)->cells, sizeof(cell) * (*ht)->size);
     }
@@ -100,30 +85,35 @@ static Hashstatus transfercells(hashtable **dest, hashtable **orig)
     Hashstatus st;
     cell *curcell;
 
-    if ((*dest)->size < (*orig)->nelems)
+    if ((*dest)->size < (*orig)->nelems) {
         return(ERR);
+    }
 
     curcell = (*orig)->cells + (*orig)->size;
 
-    while (curcell-- != (*orig)->cells)
-        if (curcell->key)
+    while (curcell-- != (*orig)->cells) {
+        if (curcell->key) {
             if ( (st = puthashtable (dest, curcell->key, curcell->value)) != OK ) {
                 return(st);
             }
+        }   
+    }
 
-    return(OK);
+    return OK;
 }
 
 static Hashstatus doublehashtable(hashtable **ht)
 {
     hashtable *newht;
     Hashstatus st;
-    if ( (newht = newhashtable ((*ht)->calchash, (*ht)->equalkeys, (*ht)->size*2 + 1, (*ht)->freeelems)) == NULL )
+
+    if((newht = newhashtable ((*ht)->calchash, (*ht)->equalkeys, (*ht)->size*2 + 1, (*ht)->freeelems)) == NULL) {
         return(ERR);
+    }
 
     newht->minsize = (*ht)->minsize;
 
-    if ( (st = transfercells (&newht,ht)) != OK ) {
+    if((st = transfercells (&newht,ht)) != OK) {
         freehashtable (&newht);
         return(st);
     }
@@ -141,8 +131,9 @@ static Hashstatus halvehashtable(hashtable **ht)
     /* The size cannot be less than minsize
        If size is equal to minsize do nothing
        If size is less than minsize, set size to minsize */
-    if ((*ht)->size == (*ht)->minsize)
+    if ((*ht)->size == (*ht)->minsize) {
         return(MINSIZE);
+    }
     newsize = (*ht)->size / 2;
     if (newsize < (*ht)->minsize)
         newsize = (*ht)->minsize;
@@ -164,14 +155,20 @@ static Hashstatus halvehashtable(hashtable **ht)
 hashtable* newhashtable(hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelems)
 {
     hashtable *ht = NULL;
-    if ( (ht = (hashtable *) malloc (sizeof(hashtable))) == NULL )
-        return(NULL);
-    if (initsize % 2 == 0)
+
+    if((ht = (hashtable *) malloc (sizeof(hashtable))) == NULL ) {
+        return NULL;
+    }
+
+    if (initsize % 2 == 0) {
         initsize++;
+    }
+
     if ( (ht->cells = malloc (sizeof(cell) * initsize)) == NULL ) {
         free (ht);
         return(NULL);
     }
+
     ht->nelems = 0;
     ht->size = ht->minsize = initsize;
     ht->calchash = hfun;
@@ -198,8 +195,9 @@ Hashstatus puthashtable(hashtable **ht, void *key, void *value)
     curcell->key = key;
     curcell->value = value;
 
-    if ((double)++((*ht)->nelems) / (double)(*ht)->size > 0.75)
+    if ((double)++((*ht)->nelems) / (double)(*ht)->size > 0.75) {
         return(doublehashtable (ht));
+    }
 
     return(OK);
 }
@@ -210,12 +208,14 @@ void* gethashtable(hashtable **ht, void *key)
     index = (*ht)->calchash (key) % (*ht)->size;
     /* Search the occupied slots for a match with the key */
     while ((*ht)->cells[index].key) {
-        if ((*ht)->equalkeys (key, (*ht)->cells[index].key))
+        if ((*ht)->equalkeys (key, (*ht)->cells[index].key)) {
             return((*ht)->cells[index].value);
+        }
+
         index = (index + 1) % (*ht)->size;
     }
 
-    return(NULL);
+    return NULL;
 }
 
 Hashstatus delhashtable(hashtable **ht, void *key)
@@ -232,6 +232,7 @@ Hashstatus delhashtable(hashtable **ht, void *key)
     curcell = &((*ht)->cells[index]);
     found = 0;
     st = MINSIZE;
+
     while (curcell->key) {
         if (!found && (*ht)->equalkeys (key, curcell->key)) {
             if ((*ht)->freeelems) {
@@ -259,11 +260,15 @@ Hashstatus delhashtable(hashtable **ht, void *key)
                 curcell->key = NULL;
             }
         }
-        if (st != MINSIZE)
+
+        if (st != MINSIZE) {
             return(st);
-        if (++curcell == (*ht)->cells + (*ht)->size)
+        }
+
+        if (++curcell == (*ht)->cells + (*ht)->size) {
             curcell = (*ht)->cells;
+        }
     }
 
-    return(OK);
+    return OK;
 }

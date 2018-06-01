@@ -19,7 +19,6 @@ typedef enum {
 	MINSIZE
 } Hashstatus;
 
-typedef struct _cell cell;
 typedef struct _hashtable hashtable;
 
 typedef unsigned long (*hashfunc) (void *);
