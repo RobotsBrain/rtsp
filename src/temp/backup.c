@@ -290,4 +290,15 @@ static int receive_message(int sockfd, char* buf, int buf_size)
     return ret;
 }
 
+void free_rtsp_req(RTSP_REQUEST **req)
+{
+    if ((*req)->uri) {
+        free((*req)->uri);
+    }
+    free(*req);
+    *req = 0;
+
+    return;
+}
+
 

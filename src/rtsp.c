@@ -13,13 +13,13 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include "sdp.h"
 #include "utils.h"
 
-const int N_CAST = 2;
+// const int N_CAST = 2;
 const char *CAST_STR[] = {"unicast\0", "multicast\0"};
 
-const int N_ATTR = 6;
+// const int N_ATTR = 6;
 const char *ATTR_STR[] = {"Accept\0", "Content-Type\0", "Content-Length\0", "CSeq\0", "Session\0", "Transport\0"};
 
-const int N_METHODS = 6;
+// const int N_METHODS = 6;
 const char *METHOD_STR[] = {"DESCRIBE\0", "PLAY\0", "PAUSE\0", "SETUP\0", "TEARDOWN\0", "OPTIONS\0"};
 
 const char *RTSP_STR = "RTSP/1.0\0";
@@ -47,17 +47,16 @@ static int check_uri(char *uri)
 
 static int detect_method(char *tok_start, int text_size)
 {
-    int i;
-    int method_len;
+    int i = 0;
+    int method_len = 0;
 
     method_len = strcspn(tok_start, " ");
-    if (method_len == text_size || method_len == 0) {
+    if(method_len == text_size || method_len == 0) {
         return -1;
     }
 
-    /* Discover attribute */
-    for (i = 0; i < N_METHODS; ++i) {
-        if (!memcmp(METHOD_STR[i], tok_start, method_len)) {
+    for(i = 0; i < sizeof(METHOD_STR)/sizeof(METHOD_STR[0]); ++i) {
+        if(memcmp(METHOD_STR[i], tok_start, method_len) == 0) {
             return i;
         }
     }
@@ -67,26 +66,27 @@ static int detect_method(char *tok_start, int text_size)
 
 static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
 {
-    int i;
+    int i = 0;
     int attr = -1;
-    int attr_len;
+    int attr_len = 0;
 
     attr_len = strcspn(tok_start, ":");
-    if (attr_len == text_size || attr_len == 0) {
+    if(attr_len == text_size || attr_len == 0) {
         return 0;
     }
 
-    /* Discover attribute */
-    for (i = 0; i < N_ATTR; ++i) {
-        if (!memcmp(ATTR_STR[i], tok_start, attr_len)) {
+    for(i = 0; i < sizeof(ATTR_STR)/sizeof(ATTR_STR[0]); ++i) {
+        if(memcmp(ATTR_STR[i], tok_start, attr_len) == 0) {
             attr = i;
             break;
         }
     }
+
     tok_start += attr_len;
     text_size -= attr_len - 1;
+
     /* Ignore spaces after ':' */
-    while (*(++tok_start) == ' ') {
+    while(*(++tok_start) == ' ') {
         --text_size;
     }
 
@@ -101,12 +101,15 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
         if (!strnstr(tok_start, SDP_STR, attr_len))
             return(0);
         break;
+
     case CSEQ_STR:
         req->CSeq = atoi(tok_start);
         break;
+
     case SESSION_STR:
         req->Session = atoi(tok_start);
         break;
+
     case TRANSPORT_STR:
         /* The only acceptable transport is RTP */
         if (!strnstr(tok_start, RTP_STR, attr_len))
@@ -130,7 +133,7 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
         break;
 
     default:
-        return(1);
+        return 1;
     }
 
     return 1;
@@ -342,10 +345,11 @@ static int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size)
     int attr = -1;
     int attr_len;
     attr_len = strcspn(tok_start, ":");
+
     if (attr_len == text_size || attr_len == 0)
         return(0);
-    /* Discover attribute */
-    for (i = 0; i < N_ATTR; ++i) {
+
+    for (i = 0; i < sizeof(ATTR_STR)/sizeof(ATTR_STR[0]); ++i) {
         if (!memcmp(ATTR_STR[i], tok_start, attr_len)) {
             attr = i;
             break;
@@ -353,9 +357,11 @@ static int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size)
     }
     tok_start += attr_len;
     text_size -= attr_len - 1;
+
     /* Ignore spaces after ':' */
-    while (*(++tok_start) == ' ')
+    while (*(++tok_start) == ' ') {
         --text_size;
+    }
 
     attr_len = strcspn(tok_start, "\r\n");
     if (attr_len == text_size || attr_len == 0)
@@ -365,18 +371,22 @@ static int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size)
     case CSEQ_STR:
         res->CSeq = atoi(tok_start);
         break;
+
     case SESSION_STR:
         res->Session = atoi(tok_start);
         break;
+
     case CONTENT_TYPE_STR:
         if (memcmp(tok_start, SDP_STR, attr_len))
             return(0);
         break;
+
     case CONTENT_LENGTH_STR:
         res->Content_Length = atoi(tok_start);
         if (!res->Content_Length)
             return(0);
         break;
+
     case TRANSPORT_STR:
         /* The only acceptable transport is RTP */
         if (!strnstr(tok_start, RTP_STR, attr_len))
@@ -556,6 +566,7 @@ int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size)
     /* Write protocol and code*/
     if (res->code == -1)
         return(0);
+
     if (res->code == 200)
         status_str = OK_STR;
     else if (res->code == 500)
@@ -572,27 +583,33 @@ int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size)
     /* CSeq must have a value always*/
     if (!res->CSeq)
         return(0);
+
     /* Print to res_text */
     ret = snprintf(res_text + written, text_size - written, "CSeq: %d\r\n", res->CSeq);
     /* Check if the printed text was larger than the space available in res_text */
     if (ret < 0 || ret >= text_size-written)
         return(0);
+
     /* Add the number of characters written to written */
     written += ret;
 
     /* Respond to options */
     if (res->options != 0) {
         ret = snprintf(res_text + written, text_size - written, "%s\r\n", OPTIONS_STR);
-        if (ret < 0 || ret >= text_size - written)
+        if (ret < 0 || ret >= text_size - written) {
             return(0);
+        }
+
         written += ret;
     }
 
     /* Write session number */
     if (res->Session != -1 && res->Session != 0) {
         ret = snprintf(res_text + written, text_size - written, "Session: %d\r\n", res->Session);
-        if (ret < 0 || ret >= text_size - written)
+        if (ret < 0 || ret >= text_size - written) {
             return(0);
+        }
+
         written += ret;
     }
 
@@ -611,8 +628,10 @@ int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size)
 
     if (res->Content_Length > 0) {
         ret = snprintf(res_text + written, text_size - written, "Content-Length: %d\r\n", res->Content_Length);
-        if (ret < 0 || ret >= text_size - written)
+        if (ret < 0 || ret >= text_size - written) {
             return(0);
+        }
+
         written += ret;
     }
     /* Empty line */
@@ -827,17 +846,6 @@ RTSP_RESPONSE *rtsp_teardown_res(RTSP_REQUEST *req)
 RTSP_RESPONSE *rtsp_options_res(RTSP_REQUEST *req)
 {
     return construct_rtsp_response(200, 0, 0, 0, 0, 0, 0, 1, req);
-}
-
-void free_rtsp_req(RTSP_REQUEST **req)
-{
-    if ((*req)->uri) {
-        free((*req)->uri);
-    }
-    free(*req);
-    *req = 0;
-
-    return;
 }
 
 void rtsp_free_response(RTSP_RESPONSE **res)

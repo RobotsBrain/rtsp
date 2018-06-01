@@ -96,8 +96,6 @@ RTSP_RESPONSE *rtsp_teardown_res(RTSP_REQUEST *req);
 
 RTSP_RESPONSE *rtsp_options_res(RTSP_REQUEST *req);
 
-void free_rtsp_req(RTSP_REQUEST **req);
-
 void rtsp_free_response(RTSP_RESPONSE **res);
 
 #ifdef __cplusplus
