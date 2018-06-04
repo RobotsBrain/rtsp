@@ -109,7 +109,7 @@ static Hashstatus doublehashtable(hashtable **ht)
     hashtable *newht;
     Hashstatus st;
 
-    if((newht = newhashtable ((*ht)->calchash, (*ht)->equalkeys, (*ht)->size*2 + 1, (*ht)->freeelems)) == NULL) {
+    if((newht = hash_table_create((*ht)->calchash, (*ht)->equalkeys, (*ht)->size*2 + 1, (*ht)->freeelems)) == NULL) {
         return(ERR);
     }
 
@@ -145,11 +145,11 @@ static Hashstatus halvehashtable(hashtable **ht)
     if (newsize % 2 == 0)
         newsize++;
 
-    if ( (newht = newhashtable ((*ht)->calchash, (*ht)->equalkeys, newsize, (*ht)->freeelems)) == NULL)
+    if ( (newht = hash_table_create((*ht)->calchash, (*ht)->equalkeys, newsize, (*ht)->freeelems)) == NULL)
         return(ERR);
 
     newht->minsize = (*ht)->minsize;
-    if ( (st = transfercells (&newht, ht))  != OK ) {
+    if ( (st = transfercells(&newht, ht))  != OK ) {
         freehashtable (&newht);
         return(st);
     }
@@ -160,7 +160,7 @@ static Hashstatus halvehashtable(hashtable **ht)
     return(OK);
 }
 
-hashtable* newhashtable(hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelems)
+hashtable* hash_table_create(hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelems)
 {
     hashtable *ht = NULL;
 

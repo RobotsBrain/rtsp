@@ -59,9 +59,12 @@ typedef struct {
     int             options;
 } RTSP_RESPONSE;
 
-int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size);
+
+int rtsp_unpack_request(RTSP_REQUEST *req, char *req_text, int text_size);
+
 
 int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size);
+
 
 int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
 

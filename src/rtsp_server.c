@@ -54,6 +54,7 @@ typedef struct rtsp_server_worker_ {
 } rtsp_server_worker_s;
 
 typedef struct rtsp_server_hdl_ {
+    char                    start;
     unsigned short          port;
     pthread_t               rstid;
     hashtable*              psess_hash;
@@ -451,27 +452,19 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *re
     return res;
 }
 
-static void get_session(rtsp_server_worker_s *self, int *ext_session, INTERNAL_RTSP **rtsp_info)
+static INTERNAL_RTSP* get_session(rtsp_server_worker_s *self, int *ext_session)
 {
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
+    INTERNAL_RTSP* rtsp_info = NULL;
 
-    if(*ext_session > 0) {
-        *rtsp_info = gethashtable(&prshdl->psess_hash, ext_session);
-        if (*rtsp_info) {
-            return;
-        }
-    }
-
-    while(*ext_session < 1) {
+    if(*ext_session <= 0) {
         srand(time(0));
         *ext_session = rand();
-        *rtsp_info = gethashtable(&prshdl->psess_hash, ext_session);
-        if (*rtsp_info) {
-            *ext_session = -1;
-        }
     }
 
-    return;
+    rtsp_info = (INTERNAL_RTSP*)gethashtable(&prshdl->psess_hash, ext_session);
+
+    return rtsp_info;
 }
 
 void *rtsp_server_worker_proc(void *arg)
@@ -480,7 +473,6 @@ void *rtsp_server_worker_proc(void *arg)
     int sockfd = self->sockfd;
     int ret, st;
     int CSeq = 0;
-    int server_error;
     int Session;
     char buf[REQ_BUFFER] = {0};
     RTSP_REQUEST req[1];
@@ -491,44 +483,23 @@ void *rtsp_server_worker_proc(void *arg)
         rtsp_info = NULL;
         Session = -1;
 
-        do {
-            server_error = 0;
+        memset(buf, 0, REQ_BUFFER);
+        memset(req, 0, sizeof(RTSP_REQUEST));
 
-            memset(buf, 0, REQ_BUFFER);
+        st = read(sockfd, buf, REQ_BUFFER);
+        if (st == -1) {
+            return -1;
+        }
 
-            st = read(sockfd, buf, REQ_BUFFER);
-            if (st == -1) {
-                return 0;
-            } else if (!st) {
-                server_error = 1;
-            }
 fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
-            st = unpack_rtsp_req(req, buf, st);
-            if (server_error && st) {
-                fprintf(stderr, "caca1\n");
-                res = rtsp_server_error(req);
-                if (res) {
-                    st = rtsp_pack_response(res, buf, REQ_BUFFER);
-                    if (st) {
-                        buf[st] = 0;
-                        send(sockfd, buf, st, 0);
-                    }
-                    rtsp_free_response(&res);
-                }
-            } else if (server_error || !st) {
-                memcpy(buf, "RTSP/1.0 500 Internal server error\r\n\r\n", 38);
-                buf[38] = 0;
-                send(sockfd, buf, strlen(buf), 0);
-            }
-        } while(server_error || !st);
-        
-        get_session(self, &(req->Session), &rtsp_info);
+        st = rtsp_unpack_request(req, buf, st);
 
-        if (req->CSeq <= CSeq || 
-             ((req->method == PLAY || req->method == PAUSE || req->method == TEARDOWN) && rtsp_info == NULL)) {
+        rtsp_info = get_session(self, &(req->Session));
+        if(req->CSeq <= CSeq || rtsp_info == NULL) {
             res = rtsp_server_error(req);
         } else {
             CSeq = req->CSeq;
+
             switch(req->method) {
             case OPTIONS:
                 req->Session = 0;
@@ -559,7 +530,7 @@ fprintf(stderr, "\n########################## RECEIVED #########################
             default:
                 res = rtsp_server_error(req);
                 break;
-            }  
+            }
         }
 
         if(res) {
@@ -571,8 +542,9 @@ fprintf(stderr, "\n########################## RECEIVED #########################
             rtsp_free_response(&res);
         }
 
-        if(req->uri) {
+        if(req->uri != NULL) {
             free(req->uri);
+            req->uri = NULL;
         }
     }
 
@@ -631,7 +603,9 @@ void *rtsp_server_proc(void *arg)
         return NULL;
     }
 
-    for (;;) {
+    prshdl->start = 1;
+
+    while(prshdl->start) {
         memset(&client_addr, 0, sizeof(struct sockaddr_storage));
 
         cli_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
@@ -664,7 +638,7 @@ int rtsp_server_start(void** pphdl, rtsp_server_param_s* pparam)
 
     memset(prshdl, 0, sizeof(rtsp_server_hdl_s));
 
-    prshdl->psess_hash = newhashtable(longhash, longequal, MAX_RTSP_WORKERS * 2, 1);
+    prshdl->psess_hash = hash_table_create(longhash, longequal, MAX_RTSP_WORKERS * 2, 1);
     if(prshdl->psess_hash == NULL) {
         free(prshdl);
         return -1;
@@ -691,6 +665,10 @@ int rtsp_server_stop(void** pphdl)
     if(prshdl == NULL) {
         return -1;
     }
+
+    prshdl->start = 0;
+
+    pthread_join(prshdl->rstid, NULL);
 
     free(prshdl);
     prshdl = NULL;

@@ -31,7 +31,7 @@ unsigned long longhash(void *n);
 int longequal(void *a, void *b);
 
 
-hashtable* newhashtable(hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelements);
+hashtable* hash_table_create(hashfunc hfun, cmpfunc cfun, unsigned long initsize, char freeelements);
 
 
 void freehashtable(hashtable **ht);

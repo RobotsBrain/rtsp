@@ -13,13 +13,9 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include "sdp.h"
 #include "utils.h"
 
-// const int N_CAST = 2;
+
 const char *CAST_STR[] = {"unicast\0", "multicast\0"};
-
-// const int N_ATTR = 6;
 const char *ATTR_STR[] = {"Accept\0", "Content-Type\0", "Content-Length\0", "CSeq\0", "Session\0", "Transport\0"};
-
-// const int N_METHODS = 6;
 const char *METHOD_STR[] = {"DESCRIBE\0", "PLAY\0", "PAUSE\0", "SETUP\0", "TEARDOWN\0", "OPTIONS\0"};
 
 const char *RTSP_STR = "RTSP/1.0\0";
@@ -139,7 +135,7 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
     return 1;
 }
 
-int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
+int rtsp_unpack_request(RTSP_REQUEST *req, char *req_text, int text_size)
 {
     int attr;
     int tok_len;
@@ -151,39 +147,34 @@ int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
     req->Session = -1;
     req->client_port = 0;
 
-    /* Get method token */
     tok_len = strcspn(tok_start, " ");
-    if (tok_len == text_size) {
-        return 0;
+    if(tok_len == text_size) {
+        return -1;
     }
 
-    /* Discover method */
     req->method = detect_method(tok_start, text_size);
     if (req->method == -1) {
-        return 0;
+        return -1;
     }
 
     /* Prepare for next token */
     tok_start += tok_len + 1;
     text_size -= tok_len + 1;
 
-    /* Get uri token */
     tok_len = strcspn(tok_start, " ");
-    if (tok_len == text_size) {
-        return 0;
+    if(tok_len == text_size) {
+        return -1;
     }
 
-    /* Reserve memory for uri */
     req->uri = malloc(tok_len + 1);
-    if (!req->uri) {
-        return 0;
+    if(req->uri == NULL) {
+        return -1;
     }
 
-    /* Copy uri */
-    memcpy(req->uri, tok_start, tok_len);
+    memcpy(req->uri, tok_start, tok_len);  /* Copy uri */
     req->uri[tok_len] = 0;
     if (!check_uri(req->uri)) {
-        return 0;
+        return -1;
     }
 
     /* Prepare for next token */
@@ -195,14 +186,14 @@ int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
     if (tok_len == text_size) {
         free(req->uri);
         req->uri = 0;
-        return 0;
+        return -1;
     }
 
     /* Check if the rtsp token is valid */
     if (strncmp(tok_start, RTSP_STR, 8)) {
         free(req->uri);
         req->uri = 0;
-        return 0;
+        return -1;
     }
 
     /* Ignore next \r or \n */
@@ -218,14 +209,15 @@ int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
         if (tok_len == text_size) {
             free(req->uri);
             req->uri = 0;
-            return 0;
+            return -1;
         }
+
         /* Get all the attributes */
         attr = detect_attr_req(req, tok_start, text_size);
         if (!attr) {
             free(req->uri);
             req->uri = 0;
-            return 0;
+            return -1;
         }
         tok_start += tok_len + 1;
         text_size -= tok_len + 1;
@@ -236,39 +228,40 @@ int unpack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
     }
 
     /* If text_size is 0, a last \r\n wasn't received */
-    if (text_size == 0)
-        return 0;
+    if (text_size == 0) {
+        return -1;
+    }
 
     /* Obligatory */
     if (req->method == -1)
         return 0;
 
     /* Obligatory */
-    if (req->uri == 0)
+    if (req->uri == NULL)
         return 0;
 
     /* Obligatory */
     if (req->CSeq == -1) {
         free(req->uri);
-        req->uri = 0;
+        req->uri = NULL;
         return 0;
     }
 
     /* Session must be present if the method is PLAY, PAUSE or TEARDOWN */
     if (req->Session == -1 && (req->method == PLAY || req->method == PAUSE || req->method == TEARDOWN)) {
         free(req->uri);
-        req->uri = 0;
-        return 0;
+        req->uri = NULL;
+        return -1;
     }
 
     /* client_port must be present if the method is SETUP */
     if (req->client_port == 0 && req->method == SETUP) {
         free(req->uri);
-        req->uri = 0;
-        return 0;
+        req->uri = NULL;
+        return -1;
     }
 
-    return 1;
+    return 0;
 }
 
 int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
@@ -854,7 +847,7 @@ void rtsp_free_response(RTSP_RESPONSE **res)
         free((*res)->content);
     }
     free(*res);
-    *res = 0;
+    *res = NULL;
 
     return;
 }

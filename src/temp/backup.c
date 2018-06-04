@@ -302,3 +302,35 @@ void free_rtsp_req(RTSP_REQUEST **req)
 }
 
 
+do {
+            server_error = 0;
+
+            memset(buf, 0, REQ_BUFFER);
+
+            st = read(sockfd, buf, REQ_BUFFER);
+            if (st == -1) {
+                return -1;
+            }
+            
+fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
+            st = unpack_rtsp_req(req, buf, st);
+            if (server_error && st) {
+                fprintf(stderr, "caca1\n");
+                res = rtsp_server_error(req);
+                if (res) {
+                    st = rtsp_pack_response(res, buf, REQ_BUFFER);
+                    if (st) {
+                        buf[st] = 0;
+                        send(sockfd, buf, st, 0);
+                    }
+                    rtsp_free_response(&res);
+                }
+            } else if (server_error || !st) {
+                memcpy(buf, "RTSP/1.0 500 Internal server error\r\n\r\n", 38);
+                buf[38] = 0;
+                send(sockfd, buf, strlen(buf), 0);
+            }
+        } while(server_error || !st);
+
+
+        
