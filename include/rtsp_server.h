@@ -12,6 +12,20 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 extern "C" {
 #endif /* __cplusplus */
 
+typedef struct rtsp_stream_source_ {
+	void* priv;
+
+	int max_frame;
+
+	int (*start)(void* thiz, unsigned int session_id);
+
+	int (*stop)(void* thiz, unsigned int session_id);
+
+	int (*get_sdp)(void* thiz, unsigned int session_id, char* buf, int* size);
+
+	int (*get_next_frame)(void* thiz, unsigned int session_id, char* buf, int* size);
+} rtsp_stream_source_s;
+
 
 int rtsp_server_start(void** pphdl, unsigned short port);
 
