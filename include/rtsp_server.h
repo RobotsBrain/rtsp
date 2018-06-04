@@ -27,7 +27,13 @@ typedef struct rtsp_stream_source_ {
 } rtsp_stream_source_s;
 
 
-int rtsp_server_start(void** pphdl, unsigned short port);
+typedef struct rtsp_server_param_ {
+	unsigned short port;
+	rtsp_stream_source_s asrc;
+	rtsp_stream_source_s vsrc;
+} rtsp_server_param_s;
+
+int rtsp_server_start(void** pphdl, rtsp_server_param_s* pparam);
 
 
 int rtsp_server_stop(void** pphdl);

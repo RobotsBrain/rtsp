@@ -652,7 +652,7 @@ void *rtsp_server_proc(void *arg)
     return NULL;
 }
 
-int rtsp_server_start(void** pphdl, unsigned short port)
+int rtsp_server_start(void** pphdl, rtsp_server_param_s* pparam)
 {
     int ret = -1;
     rtsp_server_hdl_s* prshdl = NULL;
@@ -670,7 +670,7 @@ int rtsp_server_start(void** pphdl, unsigned short port)
         return -1;
     }
 
-    prshdl->port = port;
+    prshdl->port = pparam->port;
 
     ret = pthread_create(&prshdl->rstid, 0, rtsp_server_proc, prshdl);
     if(ret != 0) {

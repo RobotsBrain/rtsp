@@ -9,11 +9,11 @@
 
 int main(int argc, char **argv)
 {
-    int res = 0;
+    int ret = -1;
     unsigned short port = 8554;
 
-    while((res = getopt(argc, argv, "?p:h")) != -1) {
-        switch(res) {
+    while((ret = getopt(argc, argv, "?p:h")) != -1) {
+        switch(ret) {
         case 'p':
             port = atoi(optarg);
             break;
@@ -26,10 +26,28 @@ int main(int argc, char **argv)
         }
     }
 
-    int ret = -1;
     void* phdl = NULL;
+    rtsp_server_param_s param;
 
-    ret = rtsp_server_start(&phdl, port);
+    memset(&param, 0, sizeof(rtsp_server_param_s));
+
+    param.port = port;
+
+    param.asrc.priv = NULL;
+    param.asrc.max_frame = 200 * 1024;
+    param.asrc.start = NULL;
+    param.asrc.stop = NULL;
+    param.asrc.get_sdp = NULL;
+    param.asrc.get_next_frame = NULL;
+
+    param.vsrc.priv = NULL;
+    param.vsrc.max_frame = 200 * 1024;
+    param.vsrc.start = NULL;
+    param.vsrc.stop = NULL;
+    param.vsrc.get_sdp = NULL;
+    param.vsrc.get_next_frame = NULL;
+
+    ret = rtsp_server_start(&phdl, &param);
     if(ret < 0) {
         printf("start rtsp server fail!\n");
         return -1;
