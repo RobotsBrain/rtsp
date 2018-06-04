@@ -493,25 +493,22 @@ void *rtsp_server_worker_proc(void *arg)
 
 fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
         st = rtsp_unpack_request(req, buf, st);
-
-        rtsp_info = get_session(self, &(req->Session));
-        if(req->CSeq <= CSeq || rtsp_info == NULL) {
+        if(req->CSeq <= CSeq) {
             res = rtsp_server_error(req);
         } else {
             CSeq = req->CSeq;
 
             switch(req->method) {
             case OPTIONS:
-                req->Session = 0;
                 res = rtsp_server_options(self, req);
                 break;
 
             case DESCRIBE:
-                req->Session = 0;
                 res = rtsp_server_describe(self, req);
                 break;
 
             case SETUP:
+                rtsp_info = get_session(self, &(req->Session));
                 res = rtsp_server_setup(self, req, rtsp_info);
                 break;
 

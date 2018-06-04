@@ -551,37 +551,42 @@ int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size)
 {
     int ret;
     int written;
-    const char *status_str;
+    const char *status_str = NULL;
 
     /* Save space for the last \0 */
     --text_size;
 
     /* Write protocol and code*/
-    if (res->code == -1)
-        return(0);
+    if (res->code == -1) {
+        return 0;
+    }
 
-    if (res->code == 200)
+    if (res->code == 200) {
         status_str = OK_STR;
-    else if (res->code == 500)
+    } else if (res->code == 500) {
         status_str = SERVERERROR_STR;
-    else if (res->code == 404)
+    } else if (res->code == 404) {
         status_str = NOTFOUND_STR;
-    else
+    } else {
         status_str = NULL_STR;
+    }
 
     ret = written = snprintf(res_text, text_size, "RTSP/1.0 %d %s\r\n", res->code, status_str);
-    if (ret < 0 || ret >= text_size)
+    if (ret < 0 || ret >= text_size) {
         return(0);
+    }
 
     /* CSeq must have a value always*/
-    if (!res->CSeq)
+    if (!res->CSeq) {
         return(0);
+    }
 
     /* Print to res_text */
     ret = snprintf(res_text + written, text_size - written, "CSeq: %d\r\n", res->CSeq);
     /* Check if the printed text was larger than the space available in res_text */
-    if (ret < 0 || ret >= text_size-written)
+    if (ret < 0 || ret >= text_size-written) {
         return(0);
+    }
 
     /* Add the number of characters written to written */
     written += ret;
@@ -654,13 +659,15 @@ RTSP_REQUEST *construct_rtsp_request(METHOD method, const unsigned char *uri, in
     RTSP_REQUEST *req = 0;
     int uri_len = strlen((char *)uri);
     req = malloc(sizeof(RTSP_REQUEST));
-    if (!req)
-        return(0);
+    if (!req) {
+        return NULL;
+    }
+
     req->method = method;
     req->uri = malloc(uri_len + 1);
     if (!req->uri) {
         free(req);
-        return(0);
+        return NULL;
     }
 
     strcpy((char *)req->uri, (char *)uri);
@@ -720,7 +727,7 @@ RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cas
     res->server_port = server_port;
     res->Content_Length = Content_Length;
 
-    if (Content_Length > 0 && content != NULL) {
+    if(Content_Length > 0 && content != NULL) {
         res->content = malloc(Content_Length + 1);
         if (res->content == NULL) {
             return NULL;
