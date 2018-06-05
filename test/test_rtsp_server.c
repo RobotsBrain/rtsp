@@ -33,19 +33,12 @@ int main(int argc, char **argv)
 
     param.port = port;
 
-    param.asrc.priv = NULL;
-    param.asrc.max_frame = 200 * 1024;
-    param.asrc.start = NULL;
-    param.asrc.stop = NULL;
-    param.asrc.get_sdp = NULL;
-    param.asrc.get_next_frame = NULL;
-
-    param.vsrc.priv = NULL;
-    param.vsrc.max_frame = 200 * 1024;
-    param.vsrc.start = NULL;
-    param.vsrc.stop = NULL;
-    param.vsrc.get_sdp = NULL;
-    param.vsrc.get_next_frame = NULL;
+    param.stream_src.priv = NULL;
+    param.stream_src.max_frame = 200 * 1024;
+    param.stream_src.start = NULL;
+    param.stream_src.stop = NULL;
+    param.stream_src.get_sdp = NULL;
+    param.stream_src.get_next_frame = NULL;
 
     ret = rtsp_server_start(&phdl, &param);
     if(ret < 0) {

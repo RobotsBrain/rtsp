@@ -12,26 +12,38 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 extern "C" {
 #endif /* __cplusplus */
 
+typedef enum RTSP_STREAM_TYPE_ {
+	RTSP_STREAM_TYPE_AUDIO,
+	RTSP_STREAM_TYPE_VIDEO,
+} RTSP_STREAM_TYPE_E;
+
+
+typedef struct rtsp_stream_identify_ {
+	RTSP_STREAM_TYPE_E 	type;
+	unsigned int 		session_id;
+} rtsp_stream_identify_s;
+
+
 typedef struct rtsp_stream_source_ {
 	void* priv;
 
 	int max_frame;
 
-	int (*start)(void* thiz, unsigned int session_id);
+	int (*start)(void* thiz, rtsp_stream_identify_s* pidentify);
 
-	int (*stop)(void* thiz, unsigned int session_id);
+	int (*stop)(void* thiz, rtsp_stream_identify_s* pidentify);
 
-	int (*get_sdp)(void* thiz, unsigned int session_id, char* buf, int* size);
+	int (*get_sdp)(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size);
 
-	int (*get_next_frame)(void* thiz, unsigned int session_id, char* buf, int* size);
+	int (*get_next_frame)(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size);
 } rtsp_stream_source_s;
 
 
 typedef struct rtsp_server_param_ {
 	unsigned short port;
-	rtsp_stream_source_s asrc;
-	rtsp_stream_source_s vsrc;
+	rtsp_stream_source_s stream_src;
 } rtsp_server_param_s;
+
 
 int rtsp_server_start(void** pphdl, rtsp_server_param_s* pparam);
 
