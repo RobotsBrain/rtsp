@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "rtp.h"
+
 
 
 /****************************************************************
@@ -65,14 +67,15 @@ typedef struct {
 } RTP_header;
 
 typedef struct rtp_handle_ {
-	int 			sockfd;
-	int 			serport;
-	int 			cliport;
-	int 			ssrc;
-	unsigned long 	seq;
-	unsigned int 	timestamp;
-	pthread_t 		tid;
-	unsigned char  	nalu_buffer[1448];
+	int 					sockfd;
+	int 					serport;
+	int 					cliport;
+	int 					ssrc;
+	unsigned long 			seq;
+	unsigned int 			timestamp;
+	pthread_t 				tid;
+	unsigned char  			nalu_buffer[14480];
+	rtsp_stream_source_s	stream_src;
 } rtp_handle_s;
 
 int abstr_nalu_indic(unsigned char *buf, int buf_size, int *be_found)
@@ -241,17 +244,19 @@ long GetFileSize(FILE *infile)
 void* rtp_worker_proc(void* arg)
 {
 	rtp_handle_s* prphdl = (rtp_handle_s*)arg;
+
+	prphdl->sockfd = create_udp_connect("127.0.0.1", prphdl->serport, prphdl->cliport);
+
+	printf("[%s, %d] ~~~~~~~~~~~~~~~~~~~~~~~~(%d, %d)\n",
+			__FUNCTION__, __LINE__, prphdl->serport, prphdl->cliport);
+
+#if 0
 	FILE *infile = NULL;
 	int total_size = 0, bytes_consumed = 0, frame_size = 0, bytes_left;
 	unsigned char inbufs[READ_LEN] = {0}, outbufs[READ_LEN] = {0};
     unsigned char *p_tmp = NULL;
 	int found_nalu = 0;
 	int reach_last_nalu = 0;
-
-	prphdl->sockfd = create_udp_connect("127.0.0.1", prphdl->serport, prphdl->cliport);
-
-	printf("[%s, %d] ~~~~~~~~~~~~~~~~~~~~~~~~(%d, %d)\n",
-			__FUNCTION__, __LINE__, prphdl->serport, prphdl->cliport);
 
 	infile = fopen("1.h264", "rb");
 	if(infile == NULL) {
@@ -276,7 +281,7 @@ void* rtp_worker_proc(void* arg)
 			if(found_nalu || reach_last_nalu) {	      
 			    memcpy(outbufs, p_tmp, frame_size);
 
-				rtp_build_nalu(prphdl, outbufs, frame_size);		 
+				rtp_build_nalu(prphdl, outbufs, frame_size);
 				p_tmp += frame_size;
 				bytes_consumed += frame_size;
 
@@ -292,6 +297,18 @@ void* rtp_worker_proc(void* arg)
 	}
 
 	fclose(infile);
+#else
+	int size = 0;
+	char* buf = (char*)malloc(200 * 1024);
+
+	while(1) {
+		if(prphdl->stream_src.get_next_frame != NULL) {
+			prphdl->stream_src.get_next_frame(prphdl->stream_src.priv, NULL, buf, &size);
+			rtp_build_nalu(prphdl, buf, size);
+		}
+	}
+#endif
+
 	close(prphdl->sockfd);
 
 	printf("[%s, %d] ~~~~~~~~~~~~~~~~~~~~~~~~\n", __FUNCTION__, __LINE__);
@@ -299,7 +316,7 @@ void* rtp_worker_proc(void* arg)
 	return NULL;
 }
 
-int rtp_start(void **pphdl, int serport, int cliport, int ssrc)
+int rtp_start(void **pphdl,  rtp_param_s* pparam)
 {
 	rtp_handle_s* prphdl = NULL;
 
@@ -308,11 +325,13 @@ int rtp_start(void **pphdl, int serport, int cliport, int ssrc)
 		return -1;
 	}
 
-	prphdl->serport = serport;
-	prphdl->cliport = cliport;
+	prphdl->serport = pparam->serport;
+	prphdl->cliport = pparam->cliport;
 	prphdl->seq = 0;//random_seq();
 	prphdl->ssrc = random32(0);
 	prphdl->timestamp = -3600;//random32(0);
+
+	memcpy(&prphdl->stream_src, pparam->pstream_src, sizeof(rtsp_stream_source_s));
 
 	pthread_create(&prphdl->tid, 0, rtp_worker_proc, prphdl);
 

@@ -31,11 +31,13 @@ typedef struct {
     void*           prtphdl;
 } INTERNAL_MEDIA;
 
+
 typedef struct {
     unsigned char*  global_uri;     /* Global control uri */
     INTERNAL_MEDIA  (*medias)[1];
     int             n_medias;
 } INTERNAL_SOURCE;
+
 
 typedef struct {
     int                     Session;
@@ -45,6 +47,7 @@ typedef struct {
     struct sockaddr_storage client_addr;
 } INTERNAL_RTSP;
 
+
 typedef struct rtsp_server_worker_ {
     int         used;
     int         sockfd;
@@ -53,11 +56,13 @@ typedef struct rtsp_server_worker_ {
     void*       pcontext;
 } rtsp_server_worker_s;
 
+
 typedef struct rtsp_server_hdl_ {
     char                    start;
     unsigned short          port;
     pthread_t               rstid;
     hashtable*              psess_hash;
+    rtsp_stream_source_s    stream_src;
     rtsp_server_worker_s    workers[MAX_RTSP_WORKERS];
 } rtsp_server_hdl_s;
 
@@ -339,9 +344,15 @@ RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
             printf("~~~~~~~~~~~~~~~~~~~~~~~~~~ %s\n", req->uri);
             for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
 
-                if(strstr(rtsp_info->sources[i]->medias[j]->media_uri, "video"))
-                rtp_start(&rtsp_info->sources[i]->medias[j]->prtphdl, rtsp_info->sources[i]->medias[j]->server_port,
-                      rtsp_info->sources[i]->medias[j]->client_port, rtsp_info->sources[i]->medias[j]->ssrc);
+                if(strstr(rtsp_info->sources[i]->medias[j]->media_uri, "video")) {
+                    rtp_param_s param;
+
+                    param.serport = rtsp_info->sources[i]->medias[j]->server_port;
+                    param.cliport = rtsp_info->sources[i]->medias[j]->client_port;
+                    param.ssrc = rtsp_info->sources[i]->medias[j]->ssrc;
+                    param.pstream_src = &(prshdl->stream_src);
+                    rtp_start(&rtsp_info->sources[i]->medias[j]->prtphdl, &param);
+                }
             }
 
             if (!st) {
@@ -642,6 +653,7 @@ int rtsp_server_start(void** pphdl, rtsp_server_param_s* pparam)
     }
 
     prshdl->port = pparam->port;
+    memcpy(&prshdl->stream_src, &pparam->stream_src, sizeof(rtsp_stream_source_s));
 
     ret = pthread_create(&prshdl->rstid, 0, rtsp_server_proc, prshdl);
     if(ret != 0) {
