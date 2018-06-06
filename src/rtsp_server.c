@@ -14,7 +14,6 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <netdb.h>
 #include <pthread.h>
 
-#include "hashtable.h"
 #include "rtsp.h"
 #include "rtp.h"
 #include "rtsp_server.h"
@@ -23,6 +22,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define REQ_BUFFER          4096
 #define MAX_RTSP_WORKERS    20 /* Number of processes listening for rtsp connections */
 
+#if 0
 typedef struct {
     unsigned char*  media_uri;  /* Uri for the media */
     unsigned int    ssrc;       /* Use the ssrc to locate the corresponding RTP session */
@@ -46,7 +46,7 @@ typedef struct {
     INTERNAL_SOURCE         (*sources)[1];
     struct sockaddr_storage client_addr;
 } INTERNAL_RTSP;
-
+#endif
 
 typedef struct rtsp_server_worker_ {
     int         used;
@@ -61,17 +61,11 @@ typedef struct rtsp_server_hdl_ {
     char                    start;
     unsigned short          port;
     pthread_t               rstid;
-    hashtable*              psess_hash;
     rtsp_stream_source_s    stream_src;
     rtsp_server_worker_s    workers[MAX_RTSP_WORKERS];
 } rtsp_server_hdl_s;
 
-
-RTSP_RESPONSE *rtsp_server_options(rtsp_server_worker_s *self, RTSP_REQUEST *req)
-{
-    return rtsp_options_res(req);
-}
-
+#if 0
 RTSP_RESPONSE *rtsp_server_describe(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     if (1/* TODO: Check if file exists */) {
@@ -477,6 +471,12 @@ static INTERNAL_RTSP* get_session(rtsp_server_worker_s *self, int *ext_session)
 
     return rtsp_info;
 }
+#endif
+
+RTSP_RESPONSE *rtsp_server_options(rtsp_server_worker_s *self, RTSP_REQUEST *req)
+{
+    return rtsp_options_res(req);
+}
 
 void *rtsp_server_worker_proc(void *arg)
 {
@@ -484,25 +484,23 @@ void *rtsp_server_worker_proc(void *arg)
     int sockfd = self->sockfd;
     int ret, st;
     int CSeq = 0;
-    int Session;
     char buf[REQ_BUFFER] = {0};
     RTSP_REQUEST req[1];
     RTSP_RESPONSE *res = NULL;
-    INTERNAL_RTSP *rtsp_info = NULL;
 
     for(;;) {
-        rtsp_info = NULL;
-        Session = -1;
-
         memset(buf, 0, REQ_BUFFER);
         memset(req, 0, sizeof(RTSP_REQUEST));
 
         st = read(sockfd, buf, REQ_BUFFER);
         if (st == -1) {
             return -1;
+        } else if(st == 0) {
+            continue;
         }
 
-fprintf(stderr, "\n########################## RECEIVED ##########################\n%s", buf);
+        fprintf(stderr, "\n########################## RECEIVED\n%s", buf);
+        
         st = rtsp_unpack_request(req, buf, st);
         if(req->CSeq <= CSeq) {
             res = rtsp_server_error(req);
@@ -515,24 +513,24 @@ fprintf(stderr, "\n########################## RECEIVED #########################
                 break;
 
             case DESCRIBE:
-                res = rtsp_server_describe(self, req);
+                // res = rtsp_server_describe(self, req);
                 break;
 
             case SETUP:
-                rtsp_info = get_session(self, &(req->Session));
-                res = rtsp_server_setup(self, req, rtsp_info);
+                // rtsp_info = get_session(self, &(req->Session));
+                // res = rtsp_server_setup(self, req, rtsp_info);
                 break;
 
             case PLAY:
-                res = rtsp_server_play(self, req);
+                // res = rtsp_server_play(self, req);
                 break;
 
             case PAUSE:
-                res = rtsp_server_pause(self, req);
+                // res = rtsp_server_pause(self, req);
                 break;
 
             case TEARDOWN:
-                res = rtsp_server_teardown(self, req);
+                // res = rtsp_server_teardown(self, req);
                 break;
 
             default:
@@ -544,7 +542,7 @@ fprintf(stderr, "\n########################## RECEIVED #########################
         if(res) {
             st = rtsp_pack_response(res, buf, REQ_BUFFER);
             if (st) {
-                fprintf(stderr, "\n########################## RESPONSE ##########################\n%s\n", buf);
+                fprintf(stderr, "\n########################## RESPONSE\n%s\n", buf);
                 send(sockfd, buf, st, 0);
             }
             rtsp_free_response(&res);
@@ -645,12 +643,6 @@ int rtsp_server_start(void** pphdl, rtsp_server_param_s* pparam)
     }
 
     memset(prshdl, 0, sizeof(rtsp_server_hdl_s));
-
-    prshdl->psess_hash = hash_table_create(longhash, longequal, MAX_RTSP_WORKERS * 2, 1);
-    if(prshdl->psess_hash == NULL) {
-        free(prshdl);
-        return -1;
-    }
 
     prshdl->port = pparam->port;
     memcpy(&prshdl->stream_src, &pparam->stream_src, sizeof(rtsp_stream_source_s));
