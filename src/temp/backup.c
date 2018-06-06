@@ -332,5 +332,103 @@ fprintf(stderr, "\n########################## RECEIVED #########################
             }
         } while(server_error || !st);
 
+#if 0
+int abstr_nalu_indic(unsigned char *buf, int buf_size, int *be_found)
+{
+    int offset = 0;
+    int frame_size = 4;
+    unsigned char *p_tmp = buf + 4;
 
-        
+    *be_found = 0;
+    
+    while(frame_size < buf_size - 4) {
+        if(p_tmp[2]) {
+            offset = 3;
+        } else if(p_tmp[1]) {
+            offset = 2;
+        } else if(p_tmp[0]) {
+            offset = 1;
+        } else {
+            if(p_tmp[3] != 1) {
+                if(p_tmp[3]) {
+                    offset = 4;
+                } else {
+                    offset = 1;
+                }
+            } else {
+                *be_found = 1;
+                break;
+            }
+        }
+
+        frame_size += offset;
+        p_tmp += offset;
+    }
+
+    if(!*be_found) {
+        frame_size = buf_size;
+    }
+
+    return frame_size;
+}
+
+long GetFileSize(FILE *infile)
+{
+    long size_of_file;
+
+    fseek(infile, 0L, SEEK_END);
+
+    size_of_file = ftell(infile);
+
+    fseek(infile, 0L, SEEK_SET);
+
+    return size_of_file;
+}
+
+    FILE *infile = NULL;
+    int total_size = 0, bytes_consumed = 0, frame_size = 0, bytes_left;
+    unsigned char inbufs[READ_LEN] = {0}, outbufs[READ_LEN] = {0};
+    unsigned char *p_tmp = NULL;
+    int found_nalu = 0;
+    int reach_last_nalu = 0;
+
+    infile = fopen("1.h264", "rb");
+    if(infile == NULL) {
+        printf("please check media file\n");
+        return NULL;
+    }
+    
+    total_size = GetFileSize(infile);
+    if(total_size <= 4) {
+        fclose(infile);
+        return NULL;    
+    }
+
+    while(1) {
+        bytes_left = fread(inbufs, 1, READ_LEN, infile);
+        p_tmp = inbufs;
+
+        while(bytes_left > 0) {
+            frame_size = abstr_nalu_indic(p_tmp, bytes_left, &found_nalu);
+            reach_last_nalu = (bytes_consumed + frame_size >= total_size); 
+
+            if(found_nalu || reach_last_nalu) {       
+                memcpy(outbufs, p_tmp, frame_size);
+
+                rtp_build_nalu(prphdl, outbufs, frame_size);
+                p_tmp += frame_size;
+                bytes_consumed += frame_size;
+
+                // if(reach_last_nalu) {
+                //      rtsp[cur_conn_num]->is_runing = 0;
+                // }
+            }
+
+            bytes_left -= frame_size;
+        }
+     
+        fseek(infile, bytes_consumed, SEEK_SET);
+    }
+
+    fclose(infile);
+#endif
