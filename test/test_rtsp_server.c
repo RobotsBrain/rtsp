@@ -19,10 +19,12 @@ typedef struct test_stream_info_ {
 
 
 typedef struct test_rtsp_server_handle_ {
-    int     vfd;
-    char*   buf;
-    int     offset;
-    int     size;
+    // int     vfd;
+    // char*   buf;
+    // int     offset;
+    // int     size;
+    test_stream_info_s ainfo;
+    test_stream_info_s vinfo;
 } test_rtsp_server_handle_s;
 
 
@@ -129,18 +131,50 @@ int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int
 
     test_rtsp_server_handle_s* pthdl = (test_rtsp_server_handle_s*)thiz;
 
-    if(pthdl->offset >= pthdl->size) {
-        pthdl->offset = 0;
-    }
+    if(pidentify->type == RTSP_STREAM_TYPE_AUDIO) {
+        test_stream_info_s* sinfo = &pthdl->ainfo;
 
-    if(get_one_nalu(pthdl->buf + pthdl->offset, pthdl->size - pthdl->offset, buf, size) == 0) {
-        return -1;
-    }
+    } else if(pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
+        test_stream_info_s* sinfo = &pthdl->vinfo;
 
-    pthdl->offset += *size;
+        if(sinfo->offset >= sinfo->size) {
+            sinfo->offset = 0;
+        }
+
+        if(get_one_nalu(sinfo->buf + sinfo->offset,
+                        sinfo->size - sinfo->offset, buf, size) == 0) {
+            return -1;
+        }
+
+        sinfo->offset += *size;
+    }
 
     // printf("[%s, %d] %p, offset: %d, size: %d\n",
     //         __FUNCTION__, __LINE__, pthdl, pthdl->offset, *size);
+
+    return 0;
+}
+
+int get_file_info(const char* file, test_stream_info_s* sinfo)
+{
+    struct stat fstat;
+
+    stat(file, &fstat);
+
+    sinfo->fd = open(file, O_RDONLY|O_NONBLOCK);
+    if(sinfo->fd < 0) {
+        return -1;
+    }
+
+    sinfo->buf = (char *)malloc(fstat.st_size);
+    if(sinfo->buf == NULL) {
+        close(sinfo->fd);
+        return -1;
+    }
+
+    sinfo->size = fstat.st_size;
+
+    read(sinfo->fd, sinfo->buf, fstat.st_size);
 
     return 0;
 }
@@ -189,15 +223,8 @@ int main(int argc, char **argv)
     param.stream_src.get_sdp = get_sdp;
     param.stream_src.get_next_frame = get_next_frame;
 
-    struct stat fstat;
-
-    stat(vfile, &fstat);
-
-    testhdl.vfd = open(vfile, O_RDONLY|O_NONBLOCK);
-    testhdl.buf = (char *)malloc(fstat.st_size);
-    testhdl.size = fstat.st_size;
-
-    read(testhdl.vfd, testhdl.buf, fstat.st_size);
+    get_file_info(vfile, &testhdl.vinfo);
+    get_file_info(afile, &testhdl.ainfo);
 
     ret = rtsp_server_start(&phdl, &param);
     if(ret < 0) {
@@ -215,8 +242,8 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    free(testhdl.buf);
-    close(testhdl.vfd);
+    // free(testhdl.buf);
+    // close(testhdl.vfd);
 
     return 0;
 }
