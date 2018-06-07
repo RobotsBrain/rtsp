@@ -71,7 +71,7 @@ int start(void* thiz, rtsp_stream_identify_s* pidentify)
         return -1;
     }
 
-    test_rtsp_server_handle_s* pthdl = (test_rtsp_server_handle_s*)thiz;
+    // test_rtsp_server_handle_s* pthdl = (test_rtsp_server_handle_s*)thiz;
 
     printf("[%s, %d]\n", __FUNCTION__, __LINE__);
 
@@ -84,7 +84,7 @@ int stop(void* thiz, rtsp_stream_identify_s* pidentify)
         return -1;
     }
 
-    test_rtsp_server_handle_s* pthdl = (test_rtsp_server_handle_s*)thiz;
+    // test_rtsp_server_handle_s* pthdl = (test_rtsp_server_handle_s*)thiz;
 
     printf("[%s, %d]\n", __FUNCTION__, __LINE__);
 
@@ -97,7 +97,7 @@ int get_sdp(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size)
         return -1;
     }
 
-    test_rtsp_server_handle_s* pthdl = (test_rtsp_server_handle_s*)thiz;
+    // test_rtsp_server_handle_s* pthdl = (test_rtsp_server_handle_s*)thiz;
 
     if(pidentify->type == RTSP_STREAM_TYPE_AUDIO) {
         strcpy(buf, "m=audio 0 RTP/AVP 97\r\n"
@@ -257,11 +257,8 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    // free(testhdl.buf);
-    // close(testhdl.vfd);
-
     return 0;
 }
 
 // ffplay rtsp://127.0.0.1:8554 -v debug
-
+// ./cmake-build/out/test/test_rtsp_server -v resource/liqin.h264 -a resource/liqin.g711u

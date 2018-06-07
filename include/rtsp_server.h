@@ -27,7 +27,7 @@ typedef struct rtsp_stream_identify_ {
 
 typedef struct rtsp_stream_info_ {
 	unsigned int 	ts;
-	char* 			buf;
+	unsigned char* 	buf;
 	int 			size;
 } rtsp_stream_info_s;
 

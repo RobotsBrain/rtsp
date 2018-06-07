@@ -77,7 +77,6 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 	unsigned char fu_header;
 	unsigned char *p_nalu_data = NULL;
 	unsigned char buffer[1500] = {0};
-	int time_delay;
 	int data_left;
 	int fu_start = 1;
 	int fu_end   = 0;
@@ -122,7 +121,9 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 		memcpy(buffer + 14, p_nalu_data, proc_size);
 		buffer[12] = fu_indic;
 		buffer[13] = fu_header;
+
 		write(pvswk->sockfd, buffer, rtp_size);
+
 		if(fu_end) {
 			usleep(36000);
 		}
@@ -140,7 +141,7 @@ void* rtp_video_worker_proc(void* arg)
 	int ret = -1;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	rtp_stream_worker_s* pvswk = (rtp_stream_worker_s*)&prphdl->vsworker;
-	char* buf = NULL;
+	unsigned char* buf = NULL;
 	
 	printf("[%s, %d] begin___, (%d, %d)\n",
 			__FUNCTION__, __LINE__, pvswk->server_port, pvswk->client_port);
@@ -215,7 +216,7 @@ void* rtp_audio_worker_proc(void* arg)
 	int ret = -1;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	rtp_stream_worker_s* paswk = (rtp_stream_worker_s*)&prphdl->asworker;
-	char buf[2048] = {0};
+	unsigned char buf[2048] = {0};
 	
 	printf("[%s, %d] begin___, (%d, %d)\n",
 			__FUNCTION__, __LINE__, paswk->server_port, paswk->client_port);
@@ -282,7 +283,11 @@ int rtp_server_streaming(void* phdl, rtp_server_stream_param_s* pparam)
 		ret = pthread_create(&prphdl->asworker.tid, 0, rtp_audio_worker_proc, prphdl);
 	}
 
-	return 0;
+	if(ret != 0) {
+		printf("ret: %d, create thread fail!\n", ret);
+	}
+
+	return ret;
 }
 
 int rtp_server_init(void **pphdl,  rtp_server_param_s* pparam)

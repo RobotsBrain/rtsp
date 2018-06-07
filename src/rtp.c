@@ -1,3 +1,6 @@
+#include <arpa/inet.h>
+#include <string.h>
+
 #include "rtp.h"
 
 

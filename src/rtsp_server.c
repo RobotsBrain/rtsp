@@ -38,7 +38,7 @@ RTSP_RESPONSE *rtsp_server_describe(rtsp_server_worker_s *self, RTSP_REQUEST *re
 RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     RTSP_RESPONSE *res = NULL;
-    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
+    // rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     if(self->mssion.src_num > 2) {
         return NULL;
@@ -62,7 +62,7 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 
             int index = self->mssion.src_num;
 
-            strcpy(self->mssion.medias[index].uri, req->uri);
+            memcpy(self->mssion.medias[index].uri, req->uri, strlen(req->uri));
             self->mssion.medias[index].client_port = req->client_port;
             self->mssion.medias[index].server_port = req->client_port + 1000;
 
@@ -73,6 +73,8 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
             return res;
         }
     }
+
+    return NULL;
 }
 
 RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
@@ -125,7 +127,7 @@ void *rtsp_server_worker_proc(void *arg)
 {
     rtsp_server_worker_s* self = (rtsp_server_worker_s*)arg;
     int sockfd = self->sockfd;
-    int ret, st;
+    int st;
     int CSeq = 0;
     char buf[REQ_BUFFER] = {0};
     RTSP_REQUEST req[1];
@@ -140,7 +142,7 @@ void *rtsp_server_worker_proc(void *arg)
 
         st = read(sockfd, buf, REQ_BUFFER);
         if (st == -1) {
-            return -1;
+            return NULL;
         } else if(st == 0) {
             continue;
         }
