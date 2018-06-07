@@ -12,7 +12,6 @@ typedef struct rtsp_media_ {
     unsigned char   uri[128];
     unsigned short  client_port;
     unsigned short  server_port;
-    void*           prtphdl;
 } rtsp_media_s;
 
 
@@ -31,6 +30,7 @@ typedef struct rtsp_server_worker_ {
     pthread_t               tid;
     rtsp_session_s          mssion;
     struct sockaddr_storage client_addr;
+    void*           		prtphdl;
     void*                   pcontext;
 } rtsp_server_worker_s;
 
@@ -42,6 +42,7 @@ typedef struct rtsp_server_hdl_ {
     rtsp_stream_source_s    stream_src;
     rtsp_server_worker_s    workers[MAX_RTSP_WORKERS];
 } rtsp_server_hdl_s;
+
 
 #ifdef __cplusplus
 }

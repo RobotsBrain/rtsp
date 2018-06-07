@@ -24,16 +24,28 @@
 #define MIN(a,b) (((a)<(b)) ? (a) : (b))
 
 
+typedef struct rtp_stream_worker_ {
+	char 			start;
+	int 			sockfd;
+	int 			server_port;
+	int 			client_port;
+	unsigned short 	seq;
+	int 			ssrc;
+	pthread_t 		tid;	
+} rtp_stream_worker_s;
+
+
 typedef struct rtp_handle_ {
-	char 					start;
-	int 					sockfd;
-	int 					serport;
-	int 					cliport;
+	// char 					start;
+	// int 					sockfd;
+	// int 					serport;
+	// int 					cliport;
+	// unsigned long 			seq;
+	// pthread_t 				tid;
 	int 					ssrc;
-	unsigned long 			seq;
-	unsigned int 			timestamp;
-	pthread_t 				tid;
 	rtsp_stream_source_s	stream_src;
+	rtp_stream_worker_s 	asworker;
+	rtp_stream_worker_s		vsworker;
 } rtp_server_hdl_s;
 
 
@@ -64,7 +76,7 @@ typedef struct rtp_handle_ {
  *            R: 1 bit, Reserved
  *            Type: 5 bits, Same with NALU Header's Type.
  ******************************************************************************/
-int rtp_build_nalu(rtp_server_hdl_s* prphdl, unsigned int ts, unsigned char *inbuffer, int frame_size)
+int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *inbuffer, int frame_size)
 {
 	unsigned char nalu_header;
 	unsigned char fu_indic;
@@ -77,18 +89,18 @@ int rtp_build_nalu(rtp_server_hdl_s* prphdl, unsigned int ts, unsigned char *inb
 	int fu_end   = 0;
 	rtp_header_s rtp_header;
 
-	rtp_build_header(&rtp_header, 96, prphdl->seq, ts, prphdl->ssrc);
+	rtp_build_header(&rtp_header, 96, pvswk->seq, ts, pvswk->ssrc);
 	
 	data_left   = frame_size - NALU_INDIC_SIZE;
 	p_nalu_data = inbuffer + NALU_INDIC_SIZE;
 
 	//Single RTP Packet.
     if(data_left <= SINGLE_NALU_DATA_MAX) {
-	    rtp_header.seq_no = htons(prphdl->seq++);
+	    rtp_header.seq_no = htons(pvswk->seq++);
 	    rtp_header.marker = 1;    
 		memcpy(buffer, &rtp_header, sizeof(rtp_header_s));
         memcpy(buffer + RTP_HEADER_SIZE, p_nalu_data, data_left);
-        write(prphdl->sockfd, buffer, data_left + RTP_HEADER_SIZE);
+        write(pvswk->sockfd, buffer, data_left + RTP_HEADER_SIZE);
 		usleep(DE_TIME);
         return 0;
     }
@@ -111,12 +123,12 @@ int rtp_build_nalu(rtp_server_hdl_s* prphdl, unsigned int ts, unsigned char *inb
 			fu_header |= 0x40;
 		}
 
-        rtp_header.seq_no = htons(prphdl->seq++);
+        rtp_header.seq_no = htons(pvswk->seq++);
 		memcpy(buffer, &rtp_header, sizeof(rtp_header_s));
 		memcpy(buffer + 14, p_nalu_data, proc_size);
 		buffer[12] = fu_indic;
 		buffer[13] = fu_header;
-		write(prphdl->sockfd, buffer, rtp_size);
+		write(pvswk->sockfd, buffer, rtp_size);
 		if(fu_end) {
 			usleep(36000);
 		}
@@ -129,14 +141,15 @@ int rtp_build_nalu(rtp_server_hdl_s* prphdl, unsigned int ts, unsigned char *inb
 	return 0;	
 }
 
-void* rtp_worker_proc(void* arg)
+void* rtp_video_worker_proc(void* arg)
 {
 	int ret = -1;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
-	char* buf = (char*)malloc(200 * 1024);
+	rtp_stream_worker_s* pvswk = (rtp_stream_worker_s*)&prphdl->vsworker;
+	char* buf = NULL;
 	
 	printf("[%s, %d] begin___, (%d, %d)\n",
-			__FUNCTION__, __LINE__, prphdl->serport, prphdl->cliport);
+			__FUNCTION__, __LINE__, pvswk->server_port, pvswk->client_port);
 
 	buf = (char*)malloc(200 * 1024);
 	if(buf == NULL) {
@@ -144,18 +157,18 @@ void* rtp_worker_proc(void* arg)
 		return NULL;
 	}
 
-	prphdl->sockfd = create_udp_connect("127.0.0.1", prphdl->serport, prphdl->cliport);
-	if(prphdl->sockfd < 0) {
+	pvswk->sockfd = create_udp_connect("127.0.0.1", pvswk->server_port, pvswk->client_port);
+	if(pvswk->sockfd < 0) {
 		return NULL;
 	}
 
-	prphdl->start = 1;
+	pvswk->start = 1;
 
 	rtsp_stream_identify_s identify;
 
 	identify.type = RTSP_STREAM_TYPE_VIDEO;
 
-	while(prphdl->start) {
+	while(pvswk->start) {
 		if(prphdl->stream_src.get_next_frame != NULL) {
 			memset(buf, 0, sizeof(buf));
 
@@ -167,7 +180,7 @@ void* rtp_worker_proc(void* arg)
 			ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
 													&identify, &vsinfo);
 			if(ret == 0 && vsinfo.size > 0) {
-				ret = rtp_build_nalu(prphdl, vsinfo.ts, vsinfo.buf, vsinfo.size);
+				ret = rtp_build_nalu(pvswk, vsinfo.ts, vsinfo.buf, vsinfo.size);
 			}
 			
 			if(ret < 0) {
@@ -179,16 +192,40 @@ void* rtp_worker_proc(void* arg)
 	free(buf);
 	buf = NULL;
 
-	close(prphdl->sockfd);
+	close(pvswk->sockfd);
 
 	printf("[%s, %d] end___\n", __FUNCTION__, __LINE__);
 
 	return NULL;
 }
 
-int rtp_server_start(void **pphdl,  rtp_server_param_s* pparam)
+int rtp_server_streaming(void* phdl, rtp_server_stream_param_s* pparam)
 {
 	int ret = -1;
+	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)phdl;
+
+	if(prphdl == NULL) {
+		return -1;
+	}
+
+	if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
+		prphdl->vsworker.ssrc = random32(0);
+		prphdl->vsworker.server_port = pparam->server_port;
+		prphdl->vsworker.client_port = pparam->client_port;
+
+		ret = pthread_create(&prphdl->vsworker.tid, 0, rtp_video_worker_proc, prphdl);
+	} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
+		prphdl->asworker.ssrc = random32(0);
+		prphdl->asworker.server_port = pparam->server_port;
+		prphdl->asworker.client_port = pparam->client_port;
+	}
+
+	return 0;
+}
+
+int rtp_server_init(void **pphdl,  rtp_server_param_s* pparam)
+{
+	// int ret = -1;
 	rtp_server_hdl_s* prphdl = NULL;
 
 	prphdl = (rtp_server_hdl_s*)malloc(sizeof(rtp_server_hdl_s));
@@ -196,22 +233,21 @@ int rtp_server_start(void **pphdl,  rtp_server_param_s* pparam)
 		return -1;
 	}
 
-	prphdl->serport = pparam->serport;
-	prphdl->cliport = pparam->cliport;
-	prphdl->seq = 0;
+	// prphdl->serport = pparam->serport;
+	// prphdl->cliport = pparam->cliport;
+	// prphdl->seq = 0;
 	prphdl->ssrc = random32(0);
-	prphdl->timestamp = 0;
 
 	memcpy(&prphdl->stream_src, pparam->pstream_src, sizeof(rtsp_stream_source_s));
 
-	ret = pthread_create(&prphdl->tid, 0, rtp_worker_proc, prphdl);
+	// ret = pthread_create(&prphdl->tid, 0, rtp_worker_proc, prphdl);
 
 	*pphdl = prphdl;
 
 	return 0;
 }
 
-int rtp_server_stop(void **pphdl)
+int rtp_server_uninit(void **pphdl)
 {
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)*pphdl;
 
@@ -219,10 +255,10 @@ int rtp_server_stop(void **pphdl)
 		return -1;
 	}
 
-	prphdl->start = 0;
-	close(prphdl->sockfd);
+	// prphdl->start = 0;
+	// close(prphdl->sockfd);
 
-	pthread_join(prphdl->tid, NULL);
+	// pthread_join(prphdl->tid, NULL);
 
 	free(prphdl);
 	prphdl = NULL;

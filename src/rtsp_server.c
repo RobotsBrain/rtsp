@@ -81,19 +81,28 @@ RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 
     if (1/* TODO: Check if file exists */) {
         printf("~~~~~~~~~~~~~~~~~~~~~~~~~~ %s %d\n", req->uri, self->mssion.src_num);
+        rtp_server_param_s param;
+
+        memset(&param, 0, sizeof(rtp_server_param_s));
+
+        param.pstream_src = &(prshdl->stream_src);
+        rtp_server_init(&self->prtphdl, &param);
+
         for (int i = 0; i < self->mssion.src_num; ++i) {
+            rtp_server_stream_param_s sparam;
+
+            memset(&sparam, 0, sizeof(rtp_server_stream_param_s));
 
             if(strstr(self->mssion.medias[i].uri, "video")) {
-                rtp_server_param_s param;
-
-                memset(&param, 0, sizeof(rtp_server_param_s));
-
-                param.serport = self->mssion.medias[i].server_port;
-                param.cliport = self->mssion.medias[i].client_port;
-                param.ssrc = self->mssion.ssrc;
-                param.pstream_src = &(prshdl->stream_src);
-                rtp_server_start(&self->mssion.medias[i].prtphdl, &param);
+                sparam.type = RTSP_STREAM_TYPE_VIDEO;
+            } else if(strstr(self->mssion.medias[i].uri, "audio")){
+                sparam.type = RTSP_STREAM_TYPE_AUDIO;
             }
+
+            sparam.server_port = self->mssion.medias[i].server_port;
+            sparam.client_port = self->mssion.medias[i].client_port;
+
+            rtp_server_streaming(self->prtphdl, &sparam);
         }
 
         return rtsp_play_res(req);
