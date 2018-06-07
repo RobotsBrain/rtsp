@@ -20,6 +20,8 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 
 
 
+#define MAX_QUEUE_SIZE      20
+
 char *strnstr(const char *s1, const char *s2, size_t n)
 {
     char *buf = NULL;
@@ -105,7 +107,7 @@ unsigned long random_seq()
     return seed;
 }
 
-int create_udp_connect(const char *host, int port, int cliport)
+int create_udp_connect(const char *host, int server_port, int cliport)
 {
     int fd, reuse = 1;
     struct sockaddr_in server, rtp_address;
@@ -121,7 +123,7 @@ int create_udp_connect(const char *host, int port, int cliport)
   
     server.sin_family = AF_INET;         
     server.sin_addr.s_addr = htonl(INADDR_ANY);              
-    server.sin_port = htons(port);
+    server.sin_port = htons(server_port);
 
     if((bind(fd, (struct sockaddr *)&server, len)) < 0) {               
         printf("bind rtsp server port error"); 
@@ -138,12 +140,10 @@ int create_udp_connect(const char *host, int port, int cliport)
         return -1;
     }
 
-    printf("host: %s, server port: %d, client port: %d\n", host, port, cliport);
+    printf("host: %s, server port: %d, client port: %d\n", host, server_port, cliport);
 
     return fd;
 }
-
-#define MAX_QUEUE_SIZE      20
 
 int create_tcp_server(const char *host, int port)
 {

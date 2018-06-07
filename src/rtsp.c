@@ -13,22 +13,21 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include "utils.h"
 
 
+#define RTSP_STR            "RTSP/1.0\0"
+#define RTSP_URI            "rtsp://\0"
+#define SDP_STR             "application/sdp\0"
+#define RTP_STR             "RTP/AVP\0"
+#define CLIENT_PORT_STR     "client_port=\0"
+#define SERVER_PORT_STR     "server_port=\0"
+#define OPTIONS_STR         "Public: DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE\0"
+#define OK_STR              "OK\0"
+#define SERVERERROR_STR     "Internal server error\0"
+#define NOTFOUND_STR        "Not found\0"
+#define NULL_STR            "\0"
+
 const char *CAST_STR[] = {"unicast\0", "multicast\0"};
 const char *ATTR_STR[] = {"Accept\0", "Content-Type\0", "Content-Length\0", "CSeq\0", "Session\0", "Transport\0"};
 const char *METHOD_STR[] = {"DESCRIBE\0", "PLAY\0", "PAUSE\0", "SETUP\0", "TEARDOWN\0", "OPTIONS\0"};
-
-const char *RTSP_STR = "RTSP/1.0\0";
-const char *RTSP_URI = "rtsp://\0";
-const char *SDP_STR = "application/sdp\0";
-const char *RTP_STR = "RTP/AVP\0";
-const char *CLIENT_PORT_STR = "client_port=\0";
-const char *SERVER_PORT_STR = "server_port=\0";
-const char *OPTIONS_STR = "Public: DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE\0";
-
-const char *OK_STR = "OK\0";
-const char *SERVERERROR_STR = "Internal server error\0";
-const char *NOTFOUND_STR = "Not found\0";
-const char *NULL_STR = "\0";
 
 
 static int check_uri(char *uri)
@@ -107,8 +106,10 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
 
     case TRANSPORT_STR:
         /* The only acceptable transport is RTP */
-        if (!strnstr(tok_start, RTP_STR, attr_len))
+        if (!strnstr(tok_start, RTP_STR, attr_len)) {
             return(0);
+        }
+
         /* Check if the transport is unicast or multicast */
         if (strnstr(tok_start, CAST_STR[UNICAST], attr_len)) {
             req->cast = UNICAST;

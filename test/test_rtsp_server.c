@@ -11,18 +11,15 @@
 
 
 typedef struct test_stream_info_ {
-    int     fd;
-    char*   buf;
-    int     offset;
-    int     size;
+    int             fd;
+    char*           buf;
+    int             offset;
+    int             size;
+    unsigned int    ts;
 } test_stream_info_s;
 
 
 typedef struct test_rtsp_server_handle_ {
-    // int     vfd;
-    // char*   buf;
-    // int     offset;
-    // int     size;
     test_stream_info_s ainfo;
     test_stream_info_s vinfo;
 } test_rtsp_server_handle_s;
@@ -123,7 +120,7 @@ int get_sdp(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size)
     return 0;
 }
 
-int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size)
+int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, rtsp_stream_info_s* psvif)
 {
     if(thiz == NULL) {
         return -1;
@@ -141,12 +138,17 @@ int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int
             sinfo->offset = 0;
         }
 
+        int frame_rate_step = 3600;
+        sinfo->ts += frame_rate_step;
+
         if(get_one_nalu(sinfo->buf + sinfo->offset,
-                        sinfo->size - sinfo->offset, buf, size) == 0) {
+                        sinfo->size - sinfo->offset, psvif->buf, &psvif->size) == 0) {
             return -1;
         }
 
-        sinfo->offset += *size;
+        psvif->ts = sinfo->ts;
+
+        sinfo->offset += psvif->size;
     }
 
     // printf("[%s, %d] %p, offset: %d, size: %d\n",

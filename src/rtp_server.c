@@ -64,7 +64,7 @@ typedef struct rtp_handle_ {
  *            R: 1 bit, Reserved
  *            Type: 5 bits, Same with NALU Header's Type.
  ******************************************************************************/
-int rtp_build_nalu(rtp_server_hdl_s* prphdl, unsigned char *inbuffer, int frame_size)
+int rtp_build_nalu(rtp_server_hdl_s* prphdl, unsigned int ts, unsigned char *inbuffer, int frame_size)
 {
 	unsigned char nalu_header;
 	unsigned char fu_indic;
@@ -77,10 +77,7 @@ int rtp_build_nalu(rtp_server_hdl_s* prphdl, unsigned char *inbuffer, int frame_
 	int fu_end   = 0;
 	rtp_header_s rtp_header;
 
-	int frame_rate_step = 3600;
-	prphdl->timestamp += frame_rate_step;
-
-	rtp_build_header(&rtp_header, 96, prphdl->seq, prphdl->timestamp, prphdl->ssrc);
+	rtp_build_header(&rtp_header, 96, prphdl->seq, ts, prphdl->ssrc);
 	
 	data_left   = frame_size - NALU_INDIC_SIZE;
 	p_nalu_data = inbuffer + NALU_INDIC_SIZE;
@@ -135,7 +132,6 @@ int rtp_build_nalu(rtp_server_hdl_s* prphdl, unsigned char *inbuffer, int frame_
 void* rtp_worker_proc(void* arg)
 {
 	int ret = -1;
-	int size = 0;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	char* buf = (char*)malloc(200 * 1024);
 	
@@ -149,6 +145,9 @@ void* rtp_worker_proc(void* arg)
 	}
 
 	prphdl->sockfd = create_udp_connect("127.0.0.1", prphdl->serport, prphdl->cliport);
+	if(prphdl->sockfd < 0) {
+		return NULL;
+	}
 
 	prphdl->start = 1;
 
@@ -158,13 +157,17 @@ void* rtp_worker_proc(void* arg)
 
 	while(prphdl->start) {
 		if(prphdl->stream_src.get_next_frame != NULL) {
-			size = 0;
 			memset(buf, 0, sizeof(buf));
 
+			rtsp_stream_info_s vsinfo = {0};
+
+			vsinfo.buf = buf;
+			vsinfo.size = sizeof(buf);
+
 			ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
-													&identify, buf, &size);
-			if(ret == 0 && size > 0) {
-				ret = rtp_build_nalu(prphdl, buf, size);
+													&identify, &vsinfo);
+			if(ret == 0 && vsinfo.size > 0) {
+				ret = rtp_build_nalu(prphdl, vsinfo.ts, vsinfo.buf, vsinfo.size);
 			}
 			
 			if(ret < 0) {

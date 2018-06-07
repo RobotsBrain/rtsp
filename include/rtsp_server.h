@@ -12,6 +12,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 extern "C" {
 #endif /* __cplusplus */
 
+
 typedef enum RTSP_STREAM_TYPE_ {
 	RTSP_STREAM_TYPE_AUDIO,
 	RTSP_STREAM_TYPE_VIDEO,
@@ -22,6 +23,13 @@ typedef struct rtsp_stream_identify_ {
 	RTSP_STREAM_TYPE_E 	type;
 	unsigned int 		session_id;
 } rtsp_stream_identify_s;
+
+
+typedef struct rtsp_stream_info_ {
+	unsigned int 	ts;
+	char* 			buf;
+	int 			size;
+} rtsp_stream_info_s;
 
 
 typedef struct rtsp_stream_source_ {
@@ -35,7 +43,7 @@ typedef struct rtsp_stream_source_ {
 
 	int (*get_sdp)(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size);
 
-	int (*get_next_frame)(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size);
+	int (*get_next_frame)(void* thiz, rtsp_stream_identify_s* pidentify, rtsp_stream_info_s* psinfo);
 } rtsp_stream_source_s;
 
 
