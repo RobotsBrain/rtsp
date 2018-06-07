@@ -10,7 +10,6 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <stdio.h>
 
 #include "rtsp.h"
-#include "sdp.h"
 #include "utils.h"
 
 
@@ -264,289 +263,6 @@ int rtsp_unpack_request(RTSP_REQUEST *req, char *req_text, int text_size)
     return 0;
 }
 
-int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size)
-{
-    int ret;
-    int written;
-
-    /* Save space for the last \0 */
-    --text_size;
-    req_text[text_size] = 0;
-
-    /* Write method and uri */
-    if (req->method == -1 || !req->uri)
-        return(0);
-    ret = written = snprintf(req_text, text_size, "%s %s RTSP/1.0\r\n", METHOD_STR[req->method], req->uri);
-    if (ret < 0 || ret >= text_size)
-        return(0);
-
-    /* CSeq must have a value always*/
-    if (!req->CSeq)
-        return(0);
-    /* Print to req_text */
-    ret = snprintf(req_text + written, text_size - written, "CSeq: %d\r\n", req->CSeq);
-    /* Check if the printed text was larger than the space available in req_text */
-    if (ret < 0 || ret >= text_size-written)
-        return(0);
-    /* Add the number of characters written to written */
-    written += ret;
-
-    /* Write session number */
-    if (req->Session != -1) {
-        ret = snprintf(req_text + written, text_size - written, "Session: %d\r\n", req->Session);
-        if (ret < 0 || ret >= text_size - written)
-            return(0);
-        written += ret;
-    } else {
-        /* Session must be present in PLAY, PASE and TEARDOWN */
-        if (req->method == PLAY || req->method == PAUSE || req->method == TEARDOWN)
-            return(0);
-    }
-
-    /* Accept only application/sdp in DESCRIBE */
-    if (req->method == DESCRIBE) {
-        ret = snprintf(req_text + written, text_size - written, "Accept: application/sdp\r\n");
-        if (ret < 0 || ret >= text_size - written)
-            return(0);
-        written += ret;
-    }
-
-    /* Write client port */
-    if (req->client_port) {
-        ret = snprintf(req_text + written, text_size - written, "Transport: RTP/AVP;%s;client_port=%d-%d\r\n", CAST_STR[req->cast], req->client_port, req->client_port + 1);
-        if (ret < 0 || ret >= text_size - written)
-            return(0);
-        written += ret;
-    } else {
-        /* client_port must be present in SETUP */
-        if (req->method == SETUP)
-            return(0);
-    }
-    ret = snprintf(req_text + written, text_size - written, "\r\n");
-    if (ret < 0 || ret >= text_size - written)
-        return(0);
-    written += ret;
-
-    req_text[written] = 0;
-
-    return(written);
-}
-
-static int detect_attr_res(RTSP_RESPONSE *res, char *tok_start, int text_size)
-{
-    int i;
-    int attr = -1;
-    int attr_len;
-    attr_len = strcspn(tok_start, ":");
-
-    if (attr_len == text_size || attr_len == 0)
-        return(0);
-
-    for (i = 0; i < sizeof(ATTR_STR)/sizeof(ATTR_STR[0]); ++i) {
-        if (!memcmp(ATTR_STR[i], tok_start, attr_len)) {
-            attr = i;
-            break;
-        }
-    }
-    tok_start += attr_len;
-    text_size -= attr_len - 1;
-
-    /* Ignore spaces after ':' */
-    while (*(++tok_start) == ' ') {
-        --text_size;
-    }
-
-    attr_len = strcspn(tok_start, "\r\n");
-    if (attr_len == text_size || attr_len == 0)
-        return(0);
-
-    switch (attr) {
-    case CSEQ_STR:
-        res->CSeq = atoi(tok_start);
-        break;
-
-    case SESSION_STR:
-        res->Session = atoi(tok_start);
-        break;
-
-    case CONTENT_TYPE_STR:
-        if (memcmp(tok_start, SDP_STR, attr_len))
-            return(0);
-        break;
-
-    case CONTENT_LENGTH_STR:
-        res->Content_Length = atoi(tok_start);
-        if (!res->Content_Length)
-            return(0);
-        break;
-
-    case TRANSPORT_STR:
-        /* The only acceptable transport is RTP */
-        if (!strnstr(tok_start, RTP_STR, attr_len))
-            return(0);
-        /* Check if the transport is unicast or multicast */
-        if (strnstr(tok_start, CAST_STR[UNICAST], attr_len))
-            res->cast = UNICAST;
-        else if (strnstr(tok_start, CAST_STR[MULTICAST], attr_len))
-            res->cast = MULTICAST;
-        else
-            return(0);
-
-        /* Get the client ports */
-        if ( (tok_start = strnstr(tok_start, CLIENT_PORT_STR, attr_len)) ) {
-            if (!tok_start)
-                return(0);
-            tok_start += strlen(CLIENT_PORT_STR);
-            res->client_port = (unsigned short)atoi(tok_start);
-            if (res->client_port == 0)
-                return(0);
-        }
-
-        /* Get the client ports */
-        if ( (tok_start = strnstr(tok_start, SERVER_PORT_STR, attr_len)) ) {
-            if (!tok_start)
-                return(0);
-            tok_start += strlen(SERVER_PORT_STR);
-            res->server_port = (unsigned short)atoi(tok_start);
-            if (res->server_port == 0) {
-                return 0;
-            }
-        }
-        break;
-
-    default:
-        return 1;
-    }
-
-    return 1;
-}
-
-int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size)
-{
-    char *tok_start;
-    int tok_len;
-    int attr;
-    tok_start = res_text;
-
-    /* Initialize structure */
-    res->code = -1;
-    res->CSeq = -1;
-    res->Session = -1;
-    res->client_port = 0;
-    res->server_port = 0;
-    res->Content_Length = -1;
-    res->content = 0;
-    res->options = 0;
-
-    /* Get rtsp token */
-    tok_len = strcspn(tok_start, " ");
-    if (tok_len == text_size)
-        return(0);
-
-    /* Check if the rtsp token is valid */
-    if (strncmp(tok_start, RTSP_STR, 8))
-        return(0);
-    /* Prepare for next token */
-    tok_start += tok_len + 1;
-    text_size -= tok_len + 1;
-
-    /* Check response code */
-    if (*tok_start != '2')
-        return(0);
-    res->code = atoi(tok_start);
-
-
-    /* Ignore rest of line */
-    tok_len = strcspn(tok_start, "\r\n");
-    if (tok_len == text_size)
-        return(0);
-    /* Ignore next \r or \n */
-    tok_start += tok_len + 1;
-    text_size -= tok_len + 1;
-    if (*tok_start == '\r' || *tok_start == '\n') {
-        ++tok_start;
-        --text_size;
-    }
-
-    /* Get Attributes until we find an empty line */
-    while ( (tok_len = strcspn(tok_start, "\r\n")) ) {
-        if (tok_len == text_size) {
-            if (res->content)
-                free(res->content);
-            res->content = 0;
-            return(0);
-        }
-        /* Get all the attributes */
-        attr = detect_attr_res(res, tok_start, text_size);
-        if (!attr) {
-            if (res->content)
-                free(res->content);
-            res->content = 0;
-            return(0);
-        }
-        tok_start += tok_len + 1;
-        text_size -= tok_len + 1;
-        if (*tok_start == '\r' || *tok_start == '\n') {
-            ++tok_start;
-            --text_size;
-        }
-    }
-    /* If text_size is 0, a last \r\n wasn't received */
-    if (text_size == 0)
-        return(0);
-
-    /* If there is content */
-    if (res->Content_Length != -1) {
-        /* Ignore empty line */
-        tok_start += 2;
-        text_size -= 2;
-        if (res->Content_Length > text_size)
-            return(0);
-
-        res->content = malloc(res->Content_Length + 1);
-        if (!res->content)
-            return(0);
-
-        /* Copy content */
-        memcpy(res->content, tok_start, res->Content_Length);
-        res->content[res->Content_Length] = 0;
-    }
-
-    /* Obligatory */
-    if (res->code == -1) {
-        if (res->content)
-            free(res->content);
-        res->content = 0;
-        return(0);
-    }
-    /* Obligatory */
-    if (res->CSeq == -1) {
-        if (res->content)
-            free(res->content);
-        res->content = 0;
-        return(0);
-    }
-
-    /* Is an error having Content-Length but not having content */
-    if ((res->content && res->Content_Length == -1) ||
-            (!res->content && res->Content_Length != -1)) {
-        if (res->content)
-            free(res->content);
-        res->content = 0;
-        return(0);
-    }
-
-    /* Is an error having content and transport */
-    if (res->content && res->client_port) {
-        if (res->content)
-            free(res->content);
-        res->content = 0;
-        return(0);
-    }
-
-    return(1);
-}
-
 int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size)
 {
     int ret;
@@ -652,61 +368,6 @@ int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size)
     return written;
 }
 
-RTSP_REQUEST *construct_rtsp_request(METHOD method, const unsigned char *uri, int Session,
-                                    TRANSPORT_CAST cast, unsigned short client_port)
-{
-    int CSeq = 0;
-    RTSP_REQUEST *req = 0;
-    int uri_len = strlen((char *)uri);
-    req = malloc(sizeof(RTSP_REQUEST));
-    if (!req) {
-        return NULL;
-    }
-
-    req->method = method;
-    req->uri = malloc(uri_len + 1);
-    if (!req->uri) {
-        free(req);
-        return NULL;
-    }
-
-    strcpy((char *)req->uri, (char *)uri);
-
-    req->uri[uri_len] = 0;
-    req->CSeq = ++CSeq;
-    req->Session = Session;
-    req->cast = cast;
-    req->client_port = client_port;
-
-    return req;
-}
-
-RTSP_REQUEST *rtsp_describe(const unsigned char *uri)
-{
-    return construct_rtsp_request(DESCRIBE, uri, -1, UNICAST, 0);
-}
-
-RTSP_REQUEST *rtsp_setup(const unsigned char *uri, int Session,
-                        TRANSPORT_CAST cast, unsigned short client_port)
-{
-    return construct_rtsp_request(SETUP, uri, Session, cast, client_port);
-}
-
-RTSP_REQUEST *rtsp_play(const unsigned char *uri, int Session)
-{
-    return construct_rtsp_request(PLAY, uri, Session, UNICAST, 0);
-}
-
-RTSP_REQUEST *rtsp_pause(const unsigned char *uri, int Session)
-{
-    return construct_rtsp_request(PAUSE, uri, Session, UNICAST, 0);
-}
-
-RTSP_REQUEST *rtsp_teardown(const unsigned char *uri, int Session)
-{
-    return construct_rtsp_request(TEARDOWN, uri, Session, UNICAST, 0);
-}
-
 RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cast,
                                         unsigned short server_port, unsigned short client_port,
                                         int Content_Length, char *content,
@@ -755,64 +416,33 @@ RTSP_RESPONSE *rtsp_server_error(RTSP_REQUEST *req)
     return construct_rtsp_response(501, 0, 0, 0, 0, 0, 0, 0, req);
 }
 
-RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req)
+RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req, rtsp_stream_source_s* pssrc)
 {
-    SDP sdp;
-    int uri_len = strlen(req->uri);
-    char sdp_str[1024] = {0};
+    char sdp_str[2048] = {0};
     int sdp_len = 0;
     RTSP_RESPONSE *ret = NULL;
 
-    if (strstr(req->uri, "audio") || strstr(req->uri, "video")) {
+    if(pssrc->get_sdp == NULL) {
         return NULL;
     }
 
-    sdp.n_medias = 2;
-    sdp.uri = (unsigned char *)req->uri;
-    sdp.medias = malloc(sizeof(MEDIA) * 2);
-    if (!sdp.medias) {
-        return NULL;
-    }
+    rtsp_stream_identify_s identify;
+    char buf[1024] = {0};
+    int size = 1024;
 
-    sdp.medias[0]->type = AUDIO;
-    sdp.medias[0]->port = 0;
-    sdp.medias[0]->uri = malloc(uri_len + 8);
-    if (!sdp.medias[0]->uri) {
-        free(sdp.medias);
-        return NULL;
-    }
-    memcpy(sdp.medias[0]->uri, req->uri, uri_len);
-    memcpy(sdp.medias[0]->uri + uri_len, "/audio", 7);
-    sdp.medias[0]->uri[uri_len + 7] = 0;
+    identify.type = RTSP_STREAM_TYPE_VIDEO;
+    pssrc->get_sdp(pssrc->priv, &identify, buf, &size);
+    strcpy(sdp_str, buf);
 
-    sdp.medias[1]->type = 96;
-    sdp.medias[1]->port = 0;
-    sdp.medias[1]->uri = malloc(uri_len + 8);
-    if (!sdp.medias[1]->uri) {
-        free(sdp.medias[0]->uri);
-        free(sdp.medias);
-        return NULL;
-    }
-    memcpy(sdp.medias[1]->uri, req->uri, uri_len);
-    memcpy(sdp.medias[1]->uri + uri_len, "/video", 7);
-    sdp.medias[1]->uri[uri_len + 7] = 0;
+    memset(buf, 0, sizeof(buf));
+    size = 1024;
+    identify.type = RTSP_STREAM_TYPE_AUDIO;
+    pssrc->get_sdp(pssrc->priv, &identify, buf, &size);
+    strcat(sdp_str, buf);
+    
+    sdp_len = strlen(sdp_str);
 
-    if (!(sdp_len = pack_sdp(&sdp, (unsigned char *)sdp_str, 1024))) {
-        free(sdp.medias[0]->uri);
-        free(sdp.medias[1]->uri);
-        free(sdp.medias);
-        return NULL;
-    }
-
-    char* addstr = "a=rtpmap:96 H264/90000\r\n";
-
-    strcat(sdp_str, addstr);
-    sdp_len += strlen(addstr);
     ret = construct_rtsp_response(200, -1, 0, 0, 0, sdp_len, sdp_str, 0, req);
-
-    free(sdp.medias[0]->uri);
-    free(sdp.medias[1]->uri);
-    free(sdp.medias);
 
     return ret;
 }

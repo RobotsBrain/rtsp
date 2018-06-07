@@ -8,11 +8,13 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
-#include <stdio.h>
+#include <unistd.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "md5.h"
 

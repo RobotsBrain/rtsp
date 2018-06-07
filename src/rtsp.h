@@ -8,7 +8,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #ifndef _RTSP_H_
 #define _RTSP_H_
 
-#include "sdp.h"
+#include "rtsp_server.h"
 
 
 #ifdef __cplusplus
@@ -85,7 +85,7 @@ RTSP_RESPONSE *rtsp_notfound(RTSP_REQUEST *req);
 
 RTSP_RESPONSE *rtsp_server_error(RTSP_REQUEST *req);
 
-RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req);
+RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req, rtsp_stream_source_s* pssrc);
 
 RTSP_RESPONSE *rtsp_setup_res(RTSP_REQUEST *req, unsigned short server_port,
 								unsigned short client_port, TRANSPORT_CAST cast,

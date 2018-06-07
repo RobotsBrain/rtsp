@@ -45,7 +45,7 @@
 #define SLICE_FSIZE 1435
 #define DE_TIME 	3600
 
-typedef struct {
+typedef struct rtp_header_ {
 	/* byte 0 */
 	unsigned char csrc_len:4;
 	unsigned char extension:1;
@@ -64,7 +64,7 @@ typedef struct {
 
 	/* bytes 8-11 */
 	unsigned int ssrc;					/* stream number is used here. */
-} RTP_header;
+} rtp_header_s;
 
 typedef struct rtp_handle_ {
 	char 					start;
@@ -75,14 +75,13 @@ typedef struct rtp_handle_ {
 	unsigned long 			seq;
 	unsigned int 			timestamp;
 	pthread_t 				tid;
-	unsigned char  			nalu_buffer[14480];
 	rtsp_stream_source_s	stream_src;
 } rtp_handle_s;
 
 
-int rtp_build_header(rtp_handle_s* prphdl, RTP_header *r)
+int rtp_build_header(rtp_handle_s* prphdl, rtp_header_s *r)
 {
-	memset(r, 0, sizeof(RTP_header));
+	memset(r, 0, sizeof(rtp_header_s));
 
 	r->version = 2;
 	r->padding = 0;
@@ -134,12 +133,12 @@ int rtp_build_nalu(rtp_handle_s* prphdl, unsigned char *inbuffer, int frame_size
 	unsigned char fu_indic;
 	unsigned char fu_header;
 	unsigned char *p_nalu_data = NULL;
-	unsigned char *buffer = prphdl->nalu_buffer;
+	unsigned char buffer[1500] = {0};
 	int time_delay;
 	int data_left;
 	int fu_start = 1;
 	int fu_end   = 0;
-	RTP_header rtp_header;
+	rtp_header_s rtp_header;
 	
 	rtp_build_header(prphdl, &rtp_header);
 	
@@ -150,9 +149,9 @@ int rtp_build_nalu(rtp_handle_s* prphdl, unsigned char *inbuffer, int frame_size
     if(data_left <= SINGLE_NALU_DATA_MAX) {
 	    rtp_header.seq_no = htons(prphdl->seq++);
 	    rtp_header.marker = 1;    
-		memcpy(buffer, &rtp_header, sizeof(rtp_header));
+		memcpy(buffer, &rtp_header, sizeof(rtp_header_s));
         memcpy(buffer + RTP_HEADER_SIZE, p_nalu_data, data_left);
-        write(prphdl->sockfd, prphdl->nalu_buffer, data_left + RTP_HEADER_SIZE);
+        write(prphdl->sockfd, buffer, data_left + RTP_HEADER_SIZE);
 		usleep(DE_TIME);
         return 0;
     }
@@ -176,11 +175,11 @@ int rtp_build_nalu(rtp_handle_s* prphdl, unsigned char *inbuffer, int frame_size
 		}
 
         rtp_header.seq_no = htons(prphdl->seq++);
-		memcpy(buffer, &rtp_header, sizeof(rtp_header));
+		memcpy(buffer, &rtp_header, sizeof(rtp_header_s));
 		memcpy(buffer + 14, p_nalu_data, proc_size);
 		buffer[12] = fu_indic;
 		buffer[13] = fu_header;
-		write(prphdl->sockfd, prphdl->nalu_buffer, rtp_size);
+		write(prphdl->sockfd, buffer, rtp_size);
 		if(fu_end) {
 			usleep(36000);
 		}
@@ -274,6 +273,8 @@ int rtp_stop(void **pphdl)
 
 	prphdl->start = 0;
 	close(prphdl->sockfd);
+
+	pthread_join(prphdl->tid, NULL);
 
 	free(prphdl);
 	prphdl = NULL;

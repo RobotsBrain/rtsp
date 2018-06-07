@@ -10,6 +10,14 @@
 
 
 
+typedef struct test_stream_info_ {
+    int     fd;
+    char*   buf;
+    int     offset;
+    int     size;
+} test_stream_info_s;
+
+
 typedef struct test_rtsp_server_handle_ {
     int     vfd;
     char*   buf;
@@ -92,6 +100,22 @@ int get_sdp(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size)
 
     test_rtsp_server_handle_s* pthdl = (test_rtsp_server_handle_s*)thiz;
 
+    if(pidentify->type == RTSP_STREAM_TYPE_AUDIO) {
+        strcpy(buf, "m=audio 0 RTP/AVP 97\r\n"
+               "c=IN IP4 0.0.0.0\r\n"
+               "a=rtpmap:97 PCMU/8000/1\r\n"
+               "a=control:audio\r\n");
+    } else if (pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
+        strcpy(buf, "m=video 0 RTP/AVP 96\r\n"
+                    "c=IN IP4 0.0.0.0\r\n"
+                    "b=AS:96\r\n"
+                    "a=rtpmap:96 H264/%90000\r\n"
+                    "a=cliprect:0,0,640,360\r\n"
+                    "a=framesize:96 640-360\r\n"
+                    "a=fmtp:96 packetization-mode=1;profile-level-id=42801E\r\n"
+                    "a=control:video\r\n");
+    }
+
     printf("[%s, %d]\n", __FUNCTION__, __LINE__);
 
     return 0;
@@ -115,8 +139,8 @@ int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int
 
     pthdl->offset += *size;
 
-    printf("[%s, %d] %p, offset: %d, size: %d\n",
-            __FUNCTION__, __LINE__, pthdl, pthdl->offset, *size);
+    // printf("[%s, %d] %p, offset: %d, size: %d\n",
+    //         __FUNCTION__, __LINE__, pthdl, pthdl->offset, *size);
 
     return 0;
 }
@@ -126,11 +150,16 @@ int main(int argc, char **argv)
     int ret = -1;
     unsigned short port = 8554;
     char vfile[128] = {0};
+    char afile[128] = {0};
 
-    while((ret = getopt(argc, argv, "?p:v:h")) != -1) {
+    while((ret = getopt(argc, argv, "?p:a:v:h")) != -1) {
         switch(ret) {
         case 'p':
             port = atoi(optarg);
+            break;
+
+        case 'a':
+            strcpy(afile, optarg);
             break;
 
         case 'v':

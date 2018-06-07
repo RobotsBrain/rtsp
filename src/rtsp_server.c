@@ -17,341 +17,82 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include "rtsp.h"
 #include "rtp.h"
 #include "rtsp_server.h"
+#include "rtsp_server_internal.h"
 
 
-#define REQ_BUFFER          4096
-#define MAX_RTSP_WORKERS    20 /* Number of processes listening for rtsp connections */
 
-#if 0
-typedef struct {
-    unsigned char*  media_uri;  /* Uri for the media */
-    unsigned int    ssrc;       /* Use the ssrc to locate the corresponding RTP session */
-    unsigned short  client_port;
-    unsigned short  server_port;
-    void*           prtphdl;
-} INTERNAL_MEDIA;
+RTSP_RESPONSE *rtsp_server_options(rtsp_server_worker_s *self, RTSP_REQUEST *req)
+{
+    return rtsp_options_res(req);
+}
 
-
-typedef struct {
-    unsigned char*  global_uri;     /* Global control uri */
-    INTERNAL_MEDIA  (*medias)[1];
-    int             n_medias;
-} INTERNAL_SOURCE;
-
-
-typedef struct {
-    int                     Session;
-    int                     CSeq;
-    int                     n_sources;
-    INTERNAL_SOURCE         (*sources)[1];
-    struct sockaddr_storage client_addr;
-} INTERNAL_RTSP;
-#endif
-
-typedef struct rtsp_server_worker_ {
-    int         used;
-    int         sockfd;
-    pthread_t   tid;
-    struct sockaddr_storage client_addr;
-    void*       pcontext;
-} rtsp_server_worker_s;
-
-
-typedef struct rtsp_server_hdl_ {
-    char                    start;
-    unsigned short          port;
-    pthread_t               rstid;
-    rtsp_stream_source_s    stream_src;
-    rtsp_server_worker_s    workers[MAX_RTSP_WORKERS];
-} rtsp_server_hdl_s;
-
-#if 0
-RTSP_RESPONSE *rtsp_server_describe(rtsp_server_worker_s *self, RTSP_REQUEST *req)
+RTSP_RESPONSE *rtsp_server_describe(rtsp_server_worker_s *self, RTSP_REQUEST *req, rtsp_stream_source_s* pssrc)
 {
     if (1/* TODO: Check if file exists */) {
-        return rtsp_describe_res(req);
+        return rtsp_describe_res(req, pssrc);
     } else {
         return rtsp_notfound(req);
     }
 }
 
-RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req,
-                                INTERNAL_RTSP *rtsp_info)
+RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
-    int i, j, st;
-    int global_uri_len;
-    char* end_global_uri = NULL;
-    RTSP_RESPONSE *res;
-    int *Session = NULL;
+    RTSP_RESPONSE *res = NULL;
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
-    end_global_uri = strstr(req->uri, "/audio");
-    if(end_global_uri == NULL) {
-        end_global_uri = strstr(req->uri, "/video");
+    if(self->mssion.src_num > 2) {
+        return NULL;
+    } else if(self->mssion.src_num > 0) {
+        for(int i = 0; i < self->mssion.src_num; ++i) {
+            if(memcmp(self->mssion.medias[i].uri, req->uri, strlen(req->uri)) == 0) {
+                return NULL;
+            }
+        }
     }
-
-    if(end_global_uri == NULL) {
-        return rtsp_notfound(req);
-    }
-
-    global_uri_len = end_global_uri - req->uri;
 
     if(req->cast == UNICAST) {
         if(1/* TODO: Check if file exists */) {
-            if (!rtsp_info) {
-                fprintf(stderr, "Creating new session\n");
-                rtsp_info = malloc(sizeof(INTERNAL_RTSP));
-
-                rtsp_info->n_sources = 0;
-                rtsp_info->sources = 0;
-                rtsp_info->Session = req->Session;
-
-                memcpy(&(rtsp_info->client_addr), &(self->client_addr), sizeof(struct sockaddr_storage));
-
-                Session = malloc(sizeof(unsigned int));
-                *Session = req->Session;
-                st = puthashtable(&prshdl->psess_hash, Session, rtsp_info);
+            if(self->mssion.session <= 0) {
+                self->mssion.session = random32(0);
+            }
+            
+            if(self->mssion.ssrc <= 0) {
+                self->mssion.ssrc = random32(0);
             }
 
-            fprintf(stderr, "Getting session: %d\n", req->Session);
-            rtsp_info = gethashtable(&prshdl->psess_hash, &(req->Session));
-            if (!rtsp_info) { /* Check if the session has disappeared for some reason */
-                fprintf(stderr, "caca3\n");
-                return rtsp_server_error(req);
-            }
+            int index = self->mssion.src_num;
 
-            /* Check if the global uri already exists */
-            for (i = 0; i < rtsp_info->n_sources; ++i) {
-                if (!memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len)) {
-                    break;
-                }
-            }
+            strcpy(self->mssion.medias[index].uri, req->uri);
+            self->mssion.medias[index].client_port = req->client_port;
+            self->mssion.medias[index].server_port = req->client_port + 1000;
 
-            /* If it doesn't exist create it */
-            if(i == rtsp_info->n_sources) {
-                rtsp_info->sources = realloc(rtsp_info->sources, sizeof(INTERNAL_SOURCE) * ++(rtsp_info->n_sources));
-                if (!rtsp_info->sources) {
-                    fprintf(stderr, "caca4\n");
-                    return rtsp_server_error(req);
-                }
-                /* Copy global uri */
-                rtsp_info->sources[i]->global_uri = malloc (global_uri_len + 1);
-                if (!rtsp_info->sources[i]->global_uri) {
-                    fprintf(stderr, "caca5\n");
-                    return rtsp_server_error(req);
-                }
-                memcpy(rtsp_info->sources[i]->global_uri, req->uri, global_uri_len);
-                rtsp_info->sources[i]->global_uri[global_uri_len] = 0;
-                rtsp_info->sources[i]->medias = NULL;
-                rtsp_info->sources[i]->n_medias = 0;
-            }
+            self->mssion.src_num++;
 
-            /* Check if the media uri already exists */
-            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
-                if (!memcmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri))) {
-                    break;
-                }
-            }
-
-            /* If it doesn't exist create it */
-            if (j == rtsp_info->sources[i]->n_medias) {
-                rtsp_info->sources[i]->medias = realloc(rtsp_info->sources[i]->medias, sizeof(INTERNAL_SOURCE) * ++(rtsp_info->sources[i]->n_medias));
-                if (!rtsp_info->sources[i]->n_medias) {
-                    fprintf(stderr, "caca6\n");
-                    return rtsp_server_error(req);
-                }
-                /* Copy global uri */
-                rtsp_info->sources[i]->medias[j]->media_uri = malloc (strlen(req->uri) + 1);
-                if (!rtsp_info->sources[i]->medias[j]->media_uri) { 
-                    fprintf(stderr, "caca7\n");
-                    return rtsp_server_error(req);
-                }
-                memcpy(rtsp_info->sources[i]->medias[j]->media_uri, req->uri, strlen(req->uri));
-                rtsp_info->sources[i]->medias[j]->media_uri[strlen(req->uri)] = 0;
-
-                /* Put the client udp port in the structure */
-                ((struct sockaddr_in*)&rtsp_info->client_addr)->sin_port = htons(req->client_port);
-
-                rtsp_info = gethashtable(&prshdl->psess_hash, &(req->Session));
-                if (!rtsp_info) { /* Check if the session has disappeared for some reason */
-                    fprintf(stderr, "caca30\n");
-                    return rtsp_server_error(req);
-                }
-
-                rtsp_info->sources[i]->medias[j]->ssrc = random32(0);
-
-                printf("~~~~~~~~~~ ssrc: %ld\n", rtsp_info->sources[i]->medias[j]->ssrc);
-                rtsp_info->sources[i]->medias[j]->client_port = req->client_port;
-                rtsp_info->sources[i]->medias[j]->server_port = req->client_port + 1000;
-            }
-
-            res = rtsp_setup_res(req, rtsp_info->sources[i]->medias[j]->server_port, 0, UNICAST, 0);
+            res = rtsp_setup_res(req, self->mssion.medias[index].server_port, 0, UNICAST, 0);
+        
             return res;
-        } else {
-            return rtsp_notfound(req);
         }
-    } else {  /* TODO: Multicast */
-        fprintf(stderr, "caca8\n");
-    }
-
-    return rtsp_server_error(req);
-}
-
-RTSP_RESPONSE *server_simple_command(rtsp_server_worker_s *self, RTSP_REQUEST *req,
-                                    RTSP_RESPONSE *(*rtsp_command)(RTSP_REQUEST *))
-{
-    int i, j, st;
-    int global_uri_len;
-    int global_uri = 0;
-    unsigned int ssrc;
-    char *end_global_uri = NULL;
-    INTERNAL_RTSP *rtsp_info = NULL;
-    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
-
-    end_global_uri = strstr(req->uri, "/audio");
-    if (end_global_uri == NULL) {
-        end_global_uri = strstr(req->uri, "/video");
-    }
-
-    if (end_global_uri == NULL) {
-        end_global_uri = req->uri + strlen(req->uri);
-        global_uri = 1;
-    }
-
-    global_uri_len = end_global_uri - req->uri;
-
-    if (1/* TODO: Check if file exists */) {
-        rtsp_info = gethashtable(&prshdl->psess_hash, &req->Session);
-        /* Check if the session has disappeared for some reason */
-        if (!rtsp_info) {
-            fprintf(stderr, "caca9\n");
-            return rtsp_server_error(req);
-        }
-
-        /* Get global uri */
-        for (i = 0; i < rtsp_info->n_sources; ++i) {
-            if (!memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len)) {
-                break;
-            }
-        }
-
-        /* If it doesn't exist return error*/
-        if (i == rtsp_info->n_sources) {
-            fprintf(stderr, "caca10\n");
-            return rtsp_server_error(req);
-        }
-
-        if (!global_uri) {  /* If the uri isn't global */
-            /* Get the media uri */
-            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
-                if (!memcmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri))) {
-                    break;
-                }
-            }
-            /* If it doesn't exist return error */
-            if (j == rtsp_info->sources[i]->n_medias) {
-                fprintf(stderr, "caca11\n");
-                return rtsp_server_error(req);
-            }
-
-            /* Apply to only one media */
-            // ssrc = rtsp_info->sources[i]->medias[j]->ssrc;
-        } else {
-            /* Apply to all the medias in the global uri */
-            fprintf(stderr, "medias: %d\n", rtsp_info->sources[i]->n_medias);
-            st = 1;
-            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
-
-            }
-
-            if (!st) {
-                fprintf(stderr, "caca13\n");
-                return rtsp_server_error(req);
-            }
-        }
-
-        return rtsp_command(req);
-    } else {
-        return rtsp_notfound(req);
     }
 }
 
 RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
-    int i, j, st;
-    int global_uri_len;
-    int global_uri = 0;
-    unsigned int ssrc;
-    char *end_global_uri = NULL;
-    INTERNAL_RTSP *rtsp_info = NULL;
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
-    end_global_uri = strstr(req->uri, "/audio");
-    if (end_global_uri == NULL) {
-        end_global_uri = strstr(req->uri, "/video");
-    }
-
-    if (end_global_uri == NULL) {
-        end_global_uri = req->uri + strlen(req->uri);
-        global_uri = 1;
-    }
-
-    global_uri_len = end_global_uri - req->uri;
-
     if (1/* TODO: Check if file exists */) {
-        rtsp_info = gethashtable(&prshdl->psess_hash, &req->Session);
-        /* Check if the session has disappeared for some reason */
-        if (!rtsp_info) {
-            fprintf(stderr, "caca9\n");
-            return rtsp_server_error(req);
-        }
+        printf("~~~~~~~~~~~~~~~~~~~~~~~~~~ %s %d\n", req->uri, self->mssion.src_num);
+        for (int i = 0; i < self->mssion.src_num; ++i) {
 
-        /* Get global uri */
-        for (i = 0; i < rtsp_info->n_sources; ++i) {
-            if (!memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len)) {
-                break;
-            }
-        }
+            if(strstr(self->mssion.medias[i].uri, "video")) {
+                rtp_param_s param;
 
-        /* If it doesn't exist return error*/
-        if (i == rtsp_info->n_sources) {
-            fprintf(stderr, "caca10\n");
-            return rtsp_server_error(req);
-        }
+                memset(&param, 0, sizeof(rtp_param_s));
 
-        if (!global_uri) {  /* If the uri isn't global */
-            /* Get the media uri */
-            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
-                if (!memcmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri))) {
-                    break;
-                }
-            }
-            /* If it doesn't exist return error */
-            if (j == rtsp_info->sources[i]->n_medias) {
-                fprintf(stderr, "caca11\n");
-                return rtsp_server_error(req);
-            }
-        } else {
-            /* Apply to all the medias in the global uri */
-            fprintf(stderr, "medias: %d\n", rtsp_info->sources[i]->n_medias);
-            st = 1;
-            printf("~~~~~~~~~~~~~~~~~~~~~~~~~~ %s\n", req->uri);
-            for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
-
-                if(strstr(rtsp_info->sources[i]->medias[j]->media_uri, "video")) {
-                    rtp_param_s param;
-
-                    param.serport = rtsp_info->sources[i]->medias[j]->server_port;
-                    param.cliport = rtsp_info->sources[i]->medias[j]->client_port;
-                    param.ssrc = rtsp_info->sources[i]->medias[j]->ssrc;
-                    param.pstream_src = &(prshdl->stream_src);
-                    rtp_start(&rtsp_info->sources[i]->medias[j]->prtphdl, &param);
-                }
-            }
-
-            if (!st) {
-                fprintf(stderr, "caca13\n");
-                return rtsp_server_error(req);
+                param.serport = self->mssion.medias[i].server_port;
+                param.cliport = self->mssion.medias[i].client_port;
+                param.ssrc = self->mssion.ssrc;
+                param.pstream_src = &(prshdl->stream_src);
+                rtp_start(&self->mssion.medias[i].prtphdl, &param);
             }
         }
 
@@ -363,119 +104,12 @@ RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 
 RTSP_RESPONSE *rtsp_server_pause(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
-    return server_simple_command(self, req, rtsp_pause_res);
+    return NULL;
 }
 
 RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *req)
 {
-    int i, j;
-    int global_uri = 0;
-    int global_uri_len = 0;
-    char *end_global_uri = NULL;
-    INTERNAL_RTSP *rtsp_info = NULL;
-    RTSP_RESPONSE *res = NULL;
-    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
-
-    res = server_simple_command(self, req, rtsp_teardown_res);
-
-    fprintf(stderr, "uri: %s\n", req->uri);
-
-    end_global_uri = strstr(req->uri, "/audio");
-    if (!end_global_uri) {
-        end_global_uri = strstr(req->uri, "/video");
-    }
-
-    if (!end_global_uri) {
-        global_uri = 1;
-    }
-
-    if (global_uri) {
-        global_uri_len = strlen(req->uri);
-    } else {
-        global_uri_len = end_global_uri - req->uri;
-    }
-
-    rtsp_info = gethashtable(&prshdl->psess_hash, &(req->Session));
-    if (!rtsp_info) {
-        fprintf(stderr, "caca20\n");
-        free(res);
-        return rtsp_server_error(req);
-    }
-    /* Check if the global uri exists */
-    for (i = 0; i < rtsp_info->n_sources; ++i) {
-        if (strlen(rtsp_info->sources[i]->global_uri) == global_uri_len &&
-                !memcmp(req->uri, rtsp_info->sources[i]->global_uri, global_uri_len)) {
-            break;
-        }      
-    }
-
-    if (i == rtsp_info->n_sources) {
-        fprintf(stderr, "caca21\n");
-        free(res);
-        return rtsp_server_error(req);
-    }
-
-    if (global_uri) {
-        /* Delete all medias with this uri */
-        for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
-            free(rtsp_info->sources[i]->medias[j]->media_uri);
-        }
-
-        /* Free medias array */
-        free(rtsp_info->sources[i]->medias);
-
-        /* Move the other sources */
-        memmove(&(rtsp_info->sources[i]), &(rtsp_info->sources[i+1]), rtsp_info->n_sources - i - 1);
-        (--rtsp_info->n_sources);
-        /* Change size of sources array */
-        rtsp_info->sources = realloc(rtsp_info->sources, sizeof(INTERNAL_SOURCE) * rtsp_info->n_sources);
-    } else {
-        /* Check if the media uri exists */
-        for (j = 0; j < rtsp_info->sources[i]->n_medias; ++j) {
-            if (!strncmp(req->uri, rtsp_info->sources[i]->medias[j]->media_uri, strlen(req->uri))) {
-                break;
-            }
-        }
-
-        if (j == rtsp_info->sources[i]->n_medias) {
-            fprintf(stderr, "caca22\n");
-            free(res);
-            return rtsp_server_error(req);
-        }
-
-        /* Free this media */
-        free(rtsp_info->sources[i]->medias[j]->media_uri);
-
-        /* Move the other medias */
-        memmove(&(rtsp_info->sources[i]->medias[j]), &(rtsp_info->sources[i]->medias[j+1]), rtsp_info->sources[i]->n_medias - j - 1);
-        --(rtsp_info->sources[i]->n_medias);
-
-        /* Change size of sources array */
-        rtsp_info->sources[i]->medias = realloc(rtsp_info->sources[i]->medias, sizeof(INTERNAL_MEDIA) * rtsp_info->sources[i]->n_medias);
-    }
-
-    return res;
-}
-
-static INTERNAL_RTSP* get_session(rtsp_server_worker_s *self, int *ext_session)
-{
-    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
-    INTERNAL_RTSP* rtsp_info = NULL;
-
-    if(*ext_session <= 0) {
-        srand(time(0));
-        *ext_session = rand();
-    }
-
-    rtsp_info = (INTERNAL_RTSP*)gethashtable(&prshdl->psess_hash, ext_session);
-
-    return rtsp_info;
-}
-#endif
-
-RTSP_RESPONSE *rtsp_server_options(rtsp_server_worker_s *self, RTSP_REQUEST *req)
-{
-    return rtsp_options_res(req);
+    return NULL;
 }
 
 void *rtsp_server_worker_proc(void *arg)
@@ -487,8 +121,11 @@ void *rtsp_server_worker_proc(void *arg)
     char buf[REQ_BUFFER] = {0};
     RTSP_REQUEST req[1];
     RTSP_RESPONSE *res = NULL;
+    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
-    for(;;) {
+    self->start = 1;
+
+    while(self->start) {
         memset(buf, 0, REQ_BUFFER);
         memset(req, 0, sizeof(RTSP_REQUEST));
 
@@ -513,24 +150,23 @@ void *rtsp_server_worker_proc(void *arg)
                 break;
 
             case DESCRIBE:
-                // res = rtsp_server_describe(self, req);
+                res = rtsp_server_describe(self, req, &prshdl->stream_src);
                 break;
 
             case SETUP:
-                // rtsp_info = get_session(self, &(req->Session));
-                // res = rtsp_server_setup(self, req, rtsp_info);
+                res = rtsp_server_setup(self, req);
                 break;
 
             case PLAY:
-                // res = rtsp_server_play(self, req);
+                res = rtsp_server_play(self, req);
                 break;
 
             case PAUSE:
-                // res = rtsp_server_pause(self, req);
+                res = rtsp_server_pause(self, req);
                 break;
 
             case TEARDOWN:
-                // res = rtsp_server_teardown(self, req);
+                res = rtsp_server_teardown(self, req);
                 break;
 
             default:
@@ -670,6 +306,13 @@ int rtsp_server_stop(void** pphdl)
     prshdl->start = 0;
 
     pthread_join(prshdl->rstid, NULL);
+
+    for(int i = 0; i < MAX_RTSP_WORKERS; ++i) {
+        if (prshdl->workers[i].used == 1) {
+            prshdl->workers[i].start = 0;
+            pthread_join(prshdl->workers[i].tid, NULL);
+        }       
+    }
 
     free(prshdl);
     prshdl = NULL;
