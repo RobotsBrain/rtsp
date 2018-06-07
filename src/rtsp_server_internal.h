@@ -17,7 +17,6 @@ typedef struct rtsp_media_ {
 
 typedef struct rtsp_session_ {
     unsigned int    session;
-    // unsigned int    ssrc;
     int             src_num;
     rtsp_media_s    medias[2];
 } rtsp_session_s;
@@ -38,6 +37,7 @@ typedef struct rtsp_server_worker_ {
 typedef struct rtsp_server_hdl_ {
     char                    start;
     unsigned short          port;
+    char 					ipaddr[32];
     pthread_t               rstid;
     rtsp_stream_source_s    stream_src;
     rtsp_server_worker_s    workers[MAX_RTSP_WORKERS];

@@ -45,6 +45,17 @@ typedef struct rtp_handle_ {
 } rtp_server_hdl_s;
 
 
+int rtp_send_av_data(int fd, const void *buf, size_t count)
+{
+	int ret = -1;
+	size_t size = write(fd, buf, count);
+	if(size == count) {
+		ret = 0;
+	}
+
+	return ret;
+}
+
 /*******************************************************************************
  * RTP Packet:
  * 1. NALU length small than 1460-sizeof(RTP header):
@@ -95,7 +106,9 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 	    rtp_header.marker = 1;    
 		memcpy(buffer, &rtp_header, sizeof(rtp_header_s));
         memcpy(buffer + RTP_HEADER_SIZE, p_nalu_data, data_left);
-        write(pvswk->sockfd, buffer, data_left + RTP_HEADER_SIZE);
+
+        rtp_send_av_data(pvswk->sockfd, buffer, data_left + RTP_HEADER_SIZE);
+        
 		usleep(DE_TIME);
         return 0;
     }
@@ -124,7 +137,7 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 		buffer[12] = fu_indic;
 		buffer[13] = fu_header;
 
-		write(pvswk->sockfd, buffer, rtp_size);
+		rtp_send_av_data(pvswk->sockfd, buffer, rtp_size);
 
 		if(fu_end) {
 			usleep(36000);
@@ -208,7 +221,7 @@ int rtp_build_audio_pack(rtp_stream_worker_s* paswk, unsigned int ts, unsigned c
 	memcpy(sedbuf, &rtp_header, sizeof(rtp_header_s));
     memcpy(sedbuf + RTP_HEADER_SIZE, buffer, size);
 
-    write(paswk->sockfd, sedbuf, size + RTP_HEADER_SIZE);
+    rtp_send_av_data(paswk->sockfd, sedbuf, size + RTP_HEADER_SIZE);
 
     paswk->seq++;
 

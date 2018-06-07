@@ -12,7 +12,7 @@
 
 typedef struct test_stream_info_ {
     int             fd;
-    char*           buf;
+    unsigned char*  buf;
     int             offset;
     int             size;
     unsigned int    ts;
@@ -25,9 +25,9 @@ typedef struct test_rtsp_server_handle_ {
 } test_rtsp_server_handle_s;
 
 
-int get_one_nalu(char *pBufIn, int nInSize, char *pNalu, int* nNaluSize)
+int get_one_nalu(unsigned char *pBufIn, int nInSize, unsigned char *pNalu, int* nNaluSize)
 {
-    char *p = pBufIn;
+    unsigned char *p = pBufIn;
     int nStartPos = 0, nEndPos = 0;
 
     while (1) {
@@ -181,7 +181,7 @@ int get_file_info(const char* file, test_stream_info_s* sinfo)
         return -1;
     }
 
-    sinfo->buf = (char *)malloc(fstat.st_size);
+    sinfo->buf = (unsigned char *)malloc(fstat.st_size);
     if(sinfo->buf == NULL) {
         close(sinfo->fd);
         return -1;
@@ -189,7 +189,10 @@ int get_file_info(const char* file, test_stream_info_s* sinfo)
 
     sinfo->size = fstat.st_size;
 
-    read(sinfo->fd, sinfo->buf, fstat.st_size);
+    ssize_t size = read(sinfo->fd, sinfo->buf, fstat.st_size);
+    if(size <= 0) {
+        printf("read data error!\n");
+    }
 
     return 0;
 }
@@ -198,10 +201,14 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     unsigned short port = 8554;
+    char ipaddr[32] = {0};
     char vfile[128] = {0};
     char afile[128] = {0};
+    void* phdl = NULL;
+    rtsp_server_param_s param;
+    test_rtsp_server_handle_s testhdl;
 
-    while((ret = getopt(argc, argv, "?p:a:v:h")) != -1) {
+    while((ret = getopt(argc, argv, "?p:a:v:i:h")) != -1) {
         switch(ret) {
         case 'p':
             port = atoi(optarg);
@@ -215,6 +222,10 @@ int main(int argc, char **argv)
             strcpy(vfile, optarg);
             break;
 
+        case 'i':
+            strcpy(ipaddr, optarg);
+            break;
+
         case 'h':
             break;
 
@@ -223,13 +234,10 @@ int main(int argc, char **argv)
         }
     }
 
-    void* phdl = NULL;
-    rtsp_server_param_s param;
-    test_rtsp_server_handle_s testhdl;
-
     memset(&param, 0, sizeof(rtsp_server_param_s));
     memset(&testhdl, 0, sizeof(test_rtsp_server_handle_s));
 
+    strcpy(param.ipaddr, ipaddr);
     param.port = port;
     param.stream_src.priv = &testhdl;
     param.stream_src.max_frame = 200 * 1024;

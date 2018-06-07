@@ -48,8 +48,9 @@ typedef struct rtsp_stream_source_ {
 
 
 typedef struct rtsp_server_param_ {
-	unsigned short port;
-	rtsp_stream_source_s stream_src;
+	char					ipaddr[32];
+	unsigned short 			port;
+	rtsp_stream_source_s 	stream_src;
 } rtsp_server_param_s;
 
 

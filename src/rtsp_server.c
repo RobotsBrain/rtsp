@@ -252,7 +252,7 @@ void *rtsp_server_proc(void *arg)
     unsigned int client_addr_len = sizeof(client_addr);
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)arg;
 
-    sockfd = create_tcp_server(NULL, prshdl->port);
+    sockfd = create_tcp_server(prshdl->ipaddr, prshdl->port);
     if(sockfd < 0) {
         return NULL;
     }
@@ -293,6 +293,7 @@ int rtsp_server_start(void** pphdl, rtsp_server_param_s* pparam)
     memset(prshdl, 0, sizeof(rtsp_server_hdl_s));
 
     prshdl->port = pparam->port;
+    strcpy(prshdl->ipaddr, pparam->ipaddr);
     memcpy(&prshdl->stream_src, &pparam->stream_src, sizeof(rtsp_stream_source_s));
 
     ret = pthread_create(&prshdl->rstid, NULL, rtsp_server_proc, prshdl);
