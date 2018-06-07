@@ -160,8 +160,7 @@ void* rtp_video_worker_proc(void* arg)
 	rtp_stream_worker_s* pvswk = (rtp_stream_worker_s*)&prphdl->vsworker;
 	unsigned char* buf = NULL;
 	
-	printf("[%s, %d] begin___, (%d, %d)\n",
-			__FUNCTION__, __LINE__, pvswk->server_port, pvswk->client_port);
+	printf("[%s, %d] begin___\n", __FUNCTION__, __LINE__);
 
 	buf = (unsigned char*)malloc(BUF_SIZE);
 	if(buf == NULL) {
@@ -235,8 +234,7 @@ void* rtp_audio_worker_proc(void* arg)
 	rtp_stream_worker_s* paswk = (rtp_stream_worker_s*)&prphdl->asworker;
 	unsigned char buf[2048] = {0};
 	
-	printf("[%s, %d] begin___, (%d, %d)\n",
-			__FUNCTION__, __LINE__, paswk->server_port, paswk->client_port);
+	printf("[%s, %d] begin___\n", __FUNCTION__, __LINE__);
 
 	paswk->sockfd = create_udp_connect("127.0.0.1", paswk->server_port, paswk->client_port);
 	if(paswk->sockfd < 0) {
@@ -309,12 +307,21 @@ int rtp_server_start_streaming(void* phdl, rtp_server_stream_param_s* pparam)
 
 int rtp_server_stop_streaming(void* phdl)
 {
-	// int ret = -1;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)phdl;
 
 	if(prphdl == NULL) {
 		return -1;
 	}
+
+	printf("%s, %d  begin___\n", __FUNCTION__, __LINE__);
+
+	prphdl->asworker.start = 0;
+	pthread_join(prphdl->asworker.tid, NULL);
+
+	prphdl->vsworker.start = 0;
+	pthread_join(prphdl->vsworker.tid, NULL);
+
+	printf("%s, %d  end___\n", __FUNCTION__, __LINE__);
 
 	return 0;
 }

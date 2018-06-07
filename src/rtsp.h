@@ -42,7 +42,7 @@ typedef struct {
     METHOD          method;
     char*           uri; /* Memory reserved in unpack_rtsp_req */
     int             CSeq;
-    int             Session;
+    unsigned int    Session;
     TRANSPORT_CAST  cast;
     unsigned short  client_port;
 } RTSP_REQUEST;
@@ -50,7 +50,7 @@ typedef struct {
 typedef struct {
     int             code;
     int             CSeq;
-    int             Session;
+    unsigned int    Session;
     TRANSPORT_CAST  cast;
     unsigned short  client_port;
     unsigned short  server_port;

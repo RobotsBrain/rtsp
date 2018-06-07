@@ -31,6 +31,9 @@ int rtp_server_uninit(void **pphdl);
 int rtp_server_start_streaming(void* phdl, rtp_server_stream_param_s* pparam);
 
 
+int rtp_server_stop_streaming(void* phdl);
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

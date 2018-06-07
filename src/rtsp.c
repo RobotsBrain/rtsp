@@ -325,7 +325,7 @@ int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size)
 
     /* Write session number */
     if (res->Session != -1 && res->Session != 0) {
-        ret = snprintf(res_text + written, text_size - written, "Session: %d\r\n", res->Session);
+        ret = snprintf(res_text + written, text_size - written, "Session: %u\r\n", res->Session);
         if (ret < 0 || ret >= text_size - written) {
             return(0);
         }

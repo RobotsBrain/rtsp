@@ -56,10 +56,8 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
             if(self->mssion.session <= 0) {
                 self->mssion.session = random32(0);
             }
-            
-            // if(self->mssion.ssrc <= 0) {
-            //     self->mssion.ssrc = random32(0);
-            // }
+
+            req->Session = self->mssion.session;
 
             int index = self->mssion.src_num;
 
@@ -145,7 +143,7 @@ void *rtsp_server_worker_proc(void *arg)
         if (st == -1) {
             return NULL;
         } else if(st == 0) {
-            continue;
+            break;
         }
 
         fprintf(stderr, "\n########################## RECEIVED\n%s", buf);
@@ -201,6 +199,14 @@ void *rtsp_server_worker_proc(void *arg)
             req->uri = NULL;
         }
     }
+
+    if(self->prtphdl != NULL) {
+        rtp_server_stop_streaming(self->prtphdl);
+        rtp_server_uninit(&self->prtphdl);
+    }
+
+    close(self->sockfd);
+    memset(self, 0, sizeof(rtsp_server_worker_s));
 
     return NULL;
 }
