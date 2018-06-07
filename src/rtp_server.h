@@ -11,9 +11,6 @@ extern "C" {
 
 
 typedef struct rtp_param_ {
-	// int 					serport;
-	// int 					cliport;
-	// int 					ssrc;
 	rtsp_stream_source_s* 	pstream_src;
 } rtp_server_param_s;
 

@@ -36,12 +36,6 @@ typedef struct rtp_stream_worker_ {
 
 
 typedef struct rtp_handle_ {
-	// char 					start;
-	// int 					sockfd;
-	// int 					serport;
-	// int 					cliport;
-	// unsigned long 			seq;
-	// pthread_t 				tid;
 	int 					ssrc;
 	rtsp_stream_source_s	stream_src;
 	rtp_stream_worker_s 	asworker;
@@ -199,6 +193,72 @@ void* rtp_video_worker_proc(void* arg)
 	return NULL;
 }
 
+int rtp_build_audio_pack(rtp_stream_worker_s* paswk, unsigned int ts, unsigned char *buffer, int size)
+{
+	rtp_header_s rtp_header;
+	char sedbuf[2048] = {0};
+
+	rtp_build_header(&rtp_header, 97, paswk->seq, ts, paswk->ssrc);
+
+	memcpy(sedbuf, &rtp_header, sizeof(rtp_header_s));
+    memcpy(sedbuf + RTP_HEADER_SIZE, buffer, size);
+
+    write(paswk->sockfd, sedbuf, size + RTP_HEADER_SIZE);
+
+    paswk->seq++;
+
+	return 0;
+}
+
+void* rtp_audio_worker_proc(void* arg)
+{
+	int ret = -1;
+	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
+	rtp_stream_worker_s* paswk = (rtp_stream_worker_s*)&prphdl->asworker;
+	char buf[2048] = {0};
+	
+	printf("[%s, %d] begin___, (%d, %d)\n",
+			__FUNCTION__, __LINE__, paswk->server_port, paswk->client_port);
+
+	paswk->sockfd = create_udp_connect("127.0.0.1", paswk->server_port, paswk->client_port);
+	if(paswk->sockfd < 0) {
+		return NULL;
+	}
+
+	paswk->start = 1;
+
+	rtsp_stream_identify_s identify;
+
+	identify.type = RTSP_STREAM_TYPE_AUDIO;
+
+	while(paswk->start) {
+		if(prphdl->stream_src.get_next_frame != NULL) {
+			memset(buf, 0, sizeof(buf));
+
+			rtsp_stream_info_s vsinfo = {0};
+
+			vsinfo.buf = buf;
+			vsinfo.size = sizeof(buf);
+
+			ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
+													&identify, &vsinfo);
+			if(ret == 0 && vsinfo.size > 0) {
+				ret = rtp_build_audio_pack(paswk, vsinfo.ts, vsinfo.buf, vsinfo.size);
+			}
+			
+			if(ret < 0) {
+				// try to sleep some time
+			}
+		}
+	}
+
+	close(paswk->sockfd);
+
+	printf("[%s, %d] end___\n", __FUNCTION__, __LINE__);
+
+	return NULL;
+}
+
 int rtp_server_streaming(void* phdl, rtp_server_stream_param_s* pparam)
 {
 	int ret = -1;
@@ -218,6 +278,8 @@ int rtp_server_streaming(void* phdl, rtp_server_stream_param_s* pparam)
 		prphdl->asworker.ssrc = random32(0);
 		prphdl->asworker.server_port = pparam->server_port;
 		prphdl->asworker.client_port = pparam->client_port;
+
+		ret = pthread_create(&prphdl->asworker.tid, 0, rtp_audio_worker_proc, prphdl);
 	}
 
 	return 0;
@@ -225,7 +287,6 @@ int rtp_server_streaming(void* phdl, rtp_server_stream_param_s* pparam)
 
 int rtp_server_init(void **pphdl,  rtp_server_param_s* pparam)
 {
-	// int ret = -1;
 	rtp_server_hdl_s* prphdl = NULL;
 
 	prphdl = (rtp_server_hdl_s*)malloc(sizeof(rtp_server_hdl_s));
@@ -233,14 +294,9 @@ int rtp_server_init(void **pphdl,  rtp_server_param_s* pparam)
 		return -1;
 	}
 
-	// prphdl->serport = pparam->serport;
-	// prphdl->cliport = pparam->cliport;
-	// prphdl->seq = 0;
 	prphdl->ssrc = random32(0);
 
 	memcpy(&prphdl->stream_src, pparam->pstream_src, sizeof(rtsp_stream_source_s));
-
-	// ret = pthread_create(&prphdl->tid, 0, rtp_worker_proc, prphdl);
 
 	*pphdl = prphdl;
 
@@ -254,11 +310,6 @@ int rtp_server_uninit(void **pphdl)
 	if(prphdl == NULL) {
 		return -1;
 	}
-
-	// prphdl->start = 0;
-	// close(prphdl->sockfd);
-
-	// pthread_join(prphdl->tid, NULL);
 
 	free(prphdl);
 	prphdl = NULL;

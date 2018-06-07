@@ -131,6 +131,19 @@ int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, rtsp_stream_in
     if(pidentify->type == RTSP_STREAM_TYPE_AUDIO) {
         test_stream_info_s* sinfo = &pthdl->ainfo;
 
+        if(sinfo->offset >= sinfo->size) {
+            sinfo->offset = 0;
+        }
+
+
+        sinfo->ts += 200;
+
+        memcpy(psvif->buf, sinfo->buf + sinfo->offset, 800);
+
+        psvif->size = 800;
+        psvif->ts = sinfo->ts;
+
+        sinfo->offset += psvif->size;
     } else if(pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
         test_stream_info_s* sinfo = &pthdl->vinfo;
 
