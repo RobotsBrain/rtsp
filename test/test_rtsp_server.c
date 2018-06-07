@@ -269,4 +269,4 @@ int main(int argc, char **argv)
 }
 
 // ffplay rtsp://127.0.0.1:8554 -v debug
-// ./cmake-build/out/test/test_rtsp_server -v resource/liqin.h264 -a resource/liqin.g711u
+// ./cmake-build/out/test/test_rtsp_server -i 127.0.0.1 -v resource/liqin.h264 -a resource/liqin.g711u
