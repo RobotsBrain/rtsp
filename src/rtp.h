@@ -47,7 +47,7 @@ typedef struct rtp_header_ {
 } rtp_header_s;
 
 
-int rtp_build_header(rtp_header_s *phdr, unsigned short seq,
+int rtp_build_header(rtp_header_s *phdr, unsigned char payload, unsigned short seq,
 						unsigned int ts, unsigned int ssrc);
 
 

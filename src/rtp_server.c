@@ -34,7 +34,7 @@ typedef struct rtp_handle_ {
 	unsigned int 			timestamp;
 	pthread_t 				tid;
 	rtsp_stream_source_s	stream_src;
-} rtp_handle_s;
+} rtp_server_hdl_s;
 
 
 /*******************************************************************************
@@ -64,7 +64,7 @@ typedef struct rtp_handle_ {
  *            R: 1 bit, Reserved
  *            Type: 5 bits, Same with NALU Header's Type.
  ******************************************************************************/
-int rtp_build_nalu(rtp_handle_s* prphdl, unsigned char *inbuffer, int frame_size)
+int rtp_build_nalu(rtp_server_hdl_s* prphdl, unsigned char *inbuffer, int frame_size)
 {
 	unsigned char nalu_header;
 	unsigned char fu_indic;
@@ -80,7 +80,7 @@ int rtp_build_nalu(rtp_handle_s* prphdl, unsigned char *inbuffer, int frame_size
 	int frame_rate_step = 3600;
 	prphdl->timestamp += frame_rate_step;
 
-	rtp_build_header(&rtp_header, prphdl->seq, prphdl->timestamp, prphdl->ssrc);
+	rtp_build_header(&rtp_header, 96, prphdl->seq, prphdl->timestamp, prphdl->ssrc);
 	
 	data_left   = frame_size - NALU_INDIC_SIZE;
 	p_nalu_data = inbuffer + NALU_INDIC_SIZE;
@@ -136,7 +136,7 @@ void* rtp_worker_proc(void* arg)
 {
 	int ret = -1;
 	int size = 0;
-	rtp_handle_s* prphdl = (rtp_handle_s*)arg;
+	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	char* buf = (char*)malloc(200 * 1024);
 	
 	printf("[%s, %d] begin___, (%d, %d)\n",
@@ -186,9 +186,9 @@ void* rtp_worker_proc(void* arg)
 int rtp_server_start(void **pphdl,  rtp_server_param_s* pparam)
 {
 	int ret = -1;
-	rtp_handle_s* prphdl = NULL;
+	rtp_server_hdl_s* prphdl = NULL;
 
-	prphdl = (rtp_handle_s*)malloc(sizeof(rtp_handle_s));
+	prphdl = (rtp_server_hdl_s*)malloc(sizeof(rtp_server_hdl_s));
 	if(prphdl == NULL) {
 		return -1;
 	}
@@ -210,7 +210,7 @@ int rtp_server_start(void **pphdl,  rtp_server_param_s* pparam)
 
 int rtp_server_stop(void **pphdl)
 {
-	rtp_handle_s* prphdl = (rtp_handle_s*)*pphdl;
+	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)*pphdl;
 
 	if(prphdl == NULL) {
 		return -1;

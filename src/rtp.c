@@ -2,7 +2,7 @@
 
 
 
-int rtp_build_header(rtp_header_s *phdr, unsigned short seq,
+int rtp_build_header(rtp_header_s *phdr, unsigned char payload, unsigned short seq,
 						unsigned int ts, unsigned int ssrc)
 {
 	memset(phdr, 0, sizeof(rtp_header_s));
@@ -12,7 +12,7 @@ int rtp_build_header(rtp_header_s *phdr, unsigned short seq,
 	phdr->extension = 0;
 	phdr->csrc_len = 0;
 	phdr->marker = 0;
-	phdr->payload = 96;
+	phdr->payload = payload;
 	phdr->seq_no = htons(seq);
 	phdr->timestamp = htonl(ts);
 	phdr->ssrc = htonl(ssrc);
