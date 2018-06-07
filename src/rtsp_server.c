@@ -14,6 +14,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <netdb.h>
 #include <pthread.h>
 
+#include "utils.h"
 #include "rtsp.h"
 #include "rtp_server.h"
 #include "rtsp_server.h"
@@ -56,9 +57,9 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
                 self->mssion.session = random32(0);
             }
             
-            if(self->mssion.ssrc <= 0) {
-                self->mssion.ssrc = random32(0);
-            }
+            // if(self->mssion.ssrc <= 0) {
+            //     self->mssion.ssrc = random32(0);
+            // }
 
             int index = self->mssion.src_num;
 
@@ -95,16 +96,16 @@ RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 
             memset(&sparam, 0, sizeof(rtp_server_stream_param_s));
 
-            if(strstr(self->mssion.medias[i].uri, "video")) {
+            if(strstr((const char *)self->mssion.medias[i].uri, "video") != NULL) {
                 sparam.type = RTSP_STREAM_TYPE_VIDEO;
-            } else if(strstr(self->mssion.medias[i].uri, "audio")){
+            } else if(strstr((const char *)self->mssion.medias[i].uri, "audio") != NULL){
                 sparam.type = RTSP_STREAM_TYPE_AUDIO;
             }
 
             sparam.server_port = self->mssion.medias[i].server_port;
             sparam.client_port = self->mssion.medias[i].client_port;
 
-            rtp_server_streaming(self->prtphdl, &sparam);
+            rtp_server_start_streaming(self->prtphdl, &sparam);
         }
 
         return rtsp_play_res(req);
@@ -294,7 +295,7 @@ int rtsp_server_start(void** pphdl, rtsp_server_param_s* pparam)
     prshdl->port = pparam->port;
     memcpy(&prshdl->stream_src, &pparam->stream_src, sizeof(rtsp_stream_source_s));
 
-    ret = pthread_create(&prshdl->rstid, 0, rtsp_server_proc, prshdl);
+    ret = pthread_create(&prshdl->rstid, NULL, rtsp_server_proc, prshdl);
     if(ret != 0) {
         printf("create rtsp server thread fail!\n");
         free(prshdl);

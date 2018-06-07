@@ -38,11 +38,11 @@ char *strnstr(const char *s1, const char *s2, size_t n)
 
     strncpy(buf, s1, n);
 
-    ptr = strstr(buf, s2);
-    if (!ptr) {
-        result = 0;
+    ptr = strstr((const char*)buf, s2);
+    if(ptr == NULL) {
+        result = NULL;
     } else {
-        result = s1 + (ptr - buf);
+        result = (char*)s1 + (ptr - buf);
     }
 
     free(buf);

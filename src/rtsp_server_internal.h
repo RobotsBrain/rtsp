@@ -16,8 +16,8 @@ typedef struct rtsp_media_ {
 
 
 typedef struct rtsp_session_ {
-    int             session;
-    unsigned int    ssrc;
+    unsigned int    session;
+    // unsigned int    ssrc;
     int             src_num;
     rtsp_media_s    medias[2];
 } rtsp_session_s;

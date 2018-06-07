@@ -3,7 +3,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
 
+#include "utils.h"
 #include "rtp_server.h"
 
 
@@ -36,7 +38,7 @@ typedef struct rtp_stream_worker_ {
 
 
 typedef struct rtp_handle_ {
-	int 					ssrc;
+	unsigned int 			ssrc;
 	rtsp_stream_source_s	stream_src;
 	rtp_stream_worker_s 	asworker;
 	rtp_stream_worker_s		vsworker;
@@ -136,6 +138,8 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 	return 0;	
 }
 
+#define BUF_SIZE 200 * 1024
+
 void* rtp_video_worker_proc(void* arg)
 {
 	int ret = -1;
@@ -146,7 +150,7 @@ void* rtp_video_worker_proc(void* arg)
 	printf("[%s, %d] begin___, (%d, %d)\n",
 			__FUNCTION__, __LINE__, pvswk->server_port, pvswk->client_port);
 
-	buf = (char*)malloc(200 * 1024);
+	buf = (unsigned char*)malloc(BUF_SIZE);
 	if(buf == NULL) {
 		printf("can not malloc memory!\n");
 		return NULL;
@@ -165,7 +169,7 @@ void* rtp_video_worker_proc(void* arg)
 
 	while(pvswk->start) {
 		if(prphdl->stream_src.get_next_frame != NULL) {
-			memset(buf, 0, sizeof(buf));
+			memset(buf, 0, BUF_SIZE);
 
 			rtsp_stream_info_s vsinfo = {0};
 
@@ -260,7 +264,7 @@ void* rtp_audio_worker_proc(void* arg)
 	return NULL;
 }
 
-int rtp_server_streaming(void* phdl, rtp_server_stream_param_s* pparam)
+int rtp_server_start_streaming(void* phdl, rtp_server_stream_param_s* pparam)
 {
 	int ret = -1;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)phdl;
@@ -274,13 +278,13 @@ int rtp_server_streaming(void* phdl, rtp_server_stream_param_s* pparam)
 		prphdl->vsworker.server_port = pparam->server_port;
 		prphdl->vsworker.client_port = pparam->client_port;
 
-		ret = pthread_create(&prphdl->vsworker.tid, 0, rtp_video_worker_proc, prphdl);
+		ret = pthread_create(&prphdl->vsworker.tid, NULL, rtp_video_worker_proc, prphdl);
 	} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
 		prphdl->asworker.ssrc = random32(0);
 		prphdl->asworker.server_port = pparam->server_port;
 		prphdl->asworker.client_port = pparam->client_port;
 
-		ret = pthread_create(&prphdl->asworker.tid, 0, rtp_audio_worker_proc, prphdl);
+		ret = pthread_create(&prphdl->asworker.tid, NULL, rtp_audio_worker_proc, prphdl);
 	}
 
 	if(ret != 0) {
@@ -288,6 +292,18 @@ int rtp_server_streaming(void* phdl, rtp_server_stream_param_s* pparam)
 	}
 
 	return ret;
+}
+
+int rtp_server_stop_streaming(void* phdl)
+{
+	// int ret = -1;
+	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)phdl;
+
+	if(prphdl == NULL) {
+		return -1;
+	}
+
+	return 0;
 }
 
 int rtp_server_init(void **pphdl,  rtp_server_param_s* pparam)
