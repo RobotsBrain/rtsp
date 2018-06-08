@@ -62,8 +62,6 @@ int get_one_nalu(unsigned char *pBufIn, int nInSize, unsigned char *pNalu, int* 
     *nNaluSize = nEndPos - nStartPos;
     memcpy((void*)pNalu, (void*)(pBufIn + nStartPos), *nNaluSize);
 
-    // printf("~~~~~~~~~~~~~~~~~~~~~~~~ %p, %d\n", pNalu, *nNaluSize);
-
     return 1;
 }
 
