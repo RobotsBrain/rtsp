@@ -16,6 +16,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <netdb.h>
 
 #include "md5.h"
 
@@ -127,7 +128,7 @@ int create_udp_connect(const char *host, int server_port, int cliport)
     server.sin_port = htons(server_port);
 
     if((bind(fd, (struct sockaddr *)&server, len)) < 0) {               
-        printf("bind rtsp server port error"); 
+        printf("bind server port error"); 
         return -1;
     }
 
@@ -137,7 +138,7 @@ int create_udp_connect(const char *host, int server_port, int cliport)
 
     result = connect(fd, (struct sockaddr *)&rtp_address, len);
     if(result == -1) {
-        printf("connect vrtp socket error\n");
+        printf("connect socket error\n");
         return -1;
     }
 
@@ -180,5 +181,98 @@ int create_tcp_server(const char *host, int port)
     }
 
     return sockfd;
+}
+
+int parse_domain_ip_address(const char *doname, char* ipAddr)
+{
+    char** pptr = NULL;
+    struct hostent *hptr = NULL;
+    char   str[32] = {0};
+
+    if((hptr = gethostbyname(doname)) == NULL) {
+        printf("host: %s\n", doname);
+        return -1;
+    }
+
+    switch(hptr->h_addrtype) {
+    case AF_INET:
+    case AF_INET6:
+        pptr = hptr->h_addr_list;
+        for(; *pptr != NULL; pptr++) {
+            strcpy(ipAddr, inet_ntop(hptr->h_addrtype, *pptr, str, sizeof(str)));
+            return 0;
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    return -1;
+}
+
+int parse_rtsp_url_info(char const* url, char* username, char* password, char* address, int* portNum, char* path)
+{
+    uint32_t const prefixLength = 7;  
+    char const* from = &url[prefixLength];      
+    char const* tmpPos = NULL;  
+  
+    if ((tmpPos = strchr(from, '@')) != NULL) {  
+        // found <username> (and perhaps <password>).  
+        char const* usernameStart = from;  
+        char const* passwordStart = NULL;  
+        char const* p = tmpPos;  
+  
+        if ((tmpPos = strchr(from, ':')) != NULL && tmpPos < p) {  
+            passwordStart = tmpPos + 1;
+            uint32_t passwordLen = p - passwordStart;  
+            strncpy(password, passwordStart, passwordLen);
+            password[passwordLen] = '\0'; // Set the ending character.  
+        }  
+              
+        uint32_t usernameLen = 0;  
+        if (passwordStart != NULL) {
+            usernameLen = tmpPos - usernameStart;  
+        } else {  
+            usernameLen = p - usernameStart;      
+        }         
+        strncpy(username, usernameStart, usernameLen);
+        username[usernameLen] = '\0';  // Set the ending character.  
+  
+        from = p + 1; // skip the '@'  
+    }  
+  
+    const char* pathStart = NULL;  
+    if ((tmpPos = strchr(from, '/')) != NULL) {  
+        uint32_t pathLen = strlen(tmpPos + 1);  //Skip '/'  
+        strncpy(path, tmpPos + 1, pathLen + 1);  
+        pathStart = tmpPos;  
+    }  
+  
+    // Next, will parse the address and port.  
+    tmpPos = strchr(from, ':');  
+    if (tmpPos == NULL) {  
+        if (pathStart == NULL) {  
+            uint32_t addressLen = strlen(from);  
+            strncpy(address, from, addressLen + 1);  //Already include '\0'  
+        } else {  
+            uint32_t addressLen = pathStart - from;  
+            strncpy(address, from, addressLen);  
+            address[addressLen] = '\0';   //Set the ending character.  
+        }
+
+        *portNum = 554; // Has not the specified port, and will use the default value  
+    } else if (tmpPos != NULL) {  
+        uint32_t addressLen = tmpPos - from;
+        strncpy(address, from, addressLen);  
+        address[addressLen] = '\0';  //Set the ending character.  
+        *portNum = strtoul(tmpPos + 1, NULL, 10);   
+    }
+
+    if(strlen(address) <= 0) {
+        return -1;
+    }
+
+    return 0;
 }
 

@@ -38,7 +38,7 @@ typedef struct rtp_stream_worker_ {
 
 
 typedef struct rtp_handle_ {
-	unsigned int 			ssrc;
+	char 					server_ip[32];
 	rtsp_stream_source_s	stream_src;
 	rtp_stream_worker_s 	asworker;
 	rtp_stream_worker_s		vsworker;
@@ -156,6 +156,7 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 void* rtp_video_worker_proc(void* arg)
 {
 	int ret = -1;
+	rtsp_stream_identify_s identify;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	rtp_stream_worker_s* pvswk = (rtp_stream_worker_s*)&prphdl->vsworker;
 	unsigned char* buf = NULL;
@@ -168,16 +169,15 @@ void* rtp_video_worker_proc(void* arg)
 		return NULL;
 	}
 
-	pvswk->sockfd = create_udp_connect("127.0.0.1", pvswk->server_port, pvswk->client_port);
+	pvswk->sockfd = create_udp_connect(prphdl->server_ip, pvswk->server_port, pvswk->client_port);
 	if(pvswk->sockfd < 0) {
 		return NULL;
 	}
 
 	pvswk->start = 1;
 
-	rtsp_stream_identify_s identify;
-
 	identify.type = RTSP_STREAM_TYPE_VIDEO;
+	identify.session_id = pvswk->ssrc;
 
 	while(pvswk->start) {
 		if(prphdl->stream_src.get_next_frame != NULL) {
@@ -230,22 +230,22 @@ int rtp_build_audio_pack(rtp_stream_worker_s* paswk, unsigned int ts, unsigned c
 void* rtp_audio_worker_proc(void* arg)
 {
 	int ret = -1;
+	rtsp_stream_identify_s identify;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	rtp_stream_worker_s* paswk = (rtp_stream_worker_s*)&prphdl->asworker;
-	unsigned char buf[2048] = {0};
+	unsigned char buf[1600] = {0};
 	
 	printf("[%s, %d] begin___\n", __FUNCTION__, __LINE__);
 
-	paswk->sockfd = create_udp_connect("127.0.0.1", paswk->server_port, paswk->client_port);
+	paswk->sockfd = create_udp_connect(prphdl->server_ip, paswk->server_port, paswk->client_port);
 	if(paswk->sockfd < 0) {
 		return NULL;
 	}
 
 	paswk->start = 1;
 
-	rtsp_stream_identify_s identify;
-
 	identify.type = RTSP_STREAM_TYPE_AUDIO;
+	identify.session_id = paswk->ssrc;
 
 	while(paswk->start) {
 		if(prphdl->stream_src.get_next_frame != NULL) {
@@ -275,13 +275,24 @@ void* rtp_audio_worker_proc(void* arg)
 	return NULL;
 }
 
-int rtp_server_start_streaming(void* phdl, rtp_server_stream_param_s* pparam)
+int rtp_server_start_streaming(void* phdl, char* uri, rtp_server_stream_param_s* pparam)
 {
 	int ret = -1;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)phdl;
 
 	if(prphdl == NULL) {
 		return -1;
+	}
+
+	if(strlen(prphdl->server_ip) <= 0) {
+		char username[32];
+		char password[32];
+		char address[64];
+		int portNum = 0;
+		char path[128];
+
+		parse_rtsp_url_info(uri, username, password, address, &portNum, path);
+		parse_domain_ip_address(address, prphdl->server_ip);
 	}
 
 	if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
@@ -316,9 +327,11 @@ int rtp_server_stop_streaming(void* phdl)
 	printf("%s, %d  begin___\n", __FUNCTION__, __LINE__);
 
 	prphdl->asworker.start = 0;
+	close(prphdl->asworker.sockfd);
 	pthread_join(prphdl->asworker.tid, NULL);
 
 	prphdl->vsworker.start = 0;
+	close(prphdl->vsworker.sockfd);
 	pthread_join(prphdl->vsworker.tid, NULL);
 
 	printf("%s, %d  end___\n", __FUNCTION__, __LINE__);
@@ -335,11 +348,15 @@ int rtp_server_init(void **pphdl,  rtp_server_param_s* pparam)
 		return -1;
 	}
 
-	prphdl->ssrc = random32(0);
+	printf("%s, %d  begin___\n", __FUNCTION__, __LINE__);
+
+	memset(prphdl, 0, sizeof(rtp_server_hdl_s));
 
 	memcpy(&prphdl->stream_src, pparam->pstream_src, sizeof(rtsp_stream_source_s));
 
 	*pphdl = prphdl;
+
+	printf("%s, %d  end___\n", __FUNCTION__, __LINE__);
 
 	return 0;
 }
@@ -351,6 +368,8 @@ int rtp_server_uninit(void **pphdl)
 	if(prphdl == NULL) {
 		return -1;
 	}
+
+	rtp_server_stop_streaming(prphdl);
 
 	free(prphdl);
 	prphdl = NULL;

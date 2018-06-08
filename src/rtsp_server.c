@@ -103,7 +103,7 @@ RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
             sparam.server_port = self->mssion.medias[i].server_port;
             sparam.client_port = self->mssion.medias[i].client_port;
 
-            rtp_server_start_streaming(self->prtphdl, &sparam);
+            rtp_server_start_streaming(self->prtphdl, self->mssion.medias[i].uri, &sparam);
         }
 
         return rtsp_play_res(req);
