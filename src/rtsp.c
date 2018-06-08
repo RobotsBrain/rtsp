@@ -110,7 +110,6 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
             return 0;
         }
 
-        /* Check if the transport is unicast or multicast */
         if (strnstr(tok_start, CAST_STR[UNICAST], attr_len)) {
             req->cast = UNICAST;
         } else if (strnstr(tok_start, CAST_STR[MULTICAST], attr_len)) {
@@ -119,7 +118,6 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
             return 0;
         }
 
-        /* Get the client ports */
         if ( (tok_start = strnstr(tok_start, CLIENT_PORT_STR, attr_len)) ) {
             if (!tok_start) {
                 return 0;

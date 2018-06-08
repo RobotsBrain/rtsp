@@ -131,9 +131,9 @@ int get_max_frame_size(void* thiz, rtsp_stream_identify_s* pidentify)
     int size = 0;
 
     if(pidentify->type == RTSP_STREAM_TYPE_AUDIO) {
-        size = 200 * 1024;
-    } else if(pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
         size = 1024;
+    } else if(pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
+        size = 200 * 1024;
     }
 
     return size;
@@ -199,11 +199,13 @@ int get_file_info(const char* file, test_stream_info_s* sinfo)
         return -1;
     }
 
-    sinfo->buf = (unsigned char *)malloc(fstat.st_size);
+    sinfo->buf = (unsigned char *)malloc(fstat.st_size + 1);
     if(sinfo->buf == NULL) {
         close(sinfo->fd);
         return -1;
     }
+
+    memset(sinfo->buf, 0, fstat.st_size + 1);
 
     sinfo->size = fstat.st_size;
 
