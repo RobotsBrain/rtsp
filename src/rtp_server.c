@@ -18,7 +18,6 @@
 #define NALU_HEAD_SIZE  		1
 #define FU_A_INDI_SIZE  		1
 #define FU_A_HEAD_SIZE  		1
-#define READ_LEN 				150000
 #define SLICE_SIZE 				1448
 #define SLICE_FSIZE 			1435
 #define DE_TIME 				3600
