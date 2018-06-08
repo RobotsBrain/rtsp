@@ -80,8 +80,9 @@ RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
+    printf("begin___, %s %d\n", req->uri, self->mssion.src_num);
+
     if (1/* TODO: Check if file exists */) {
-        printf("~~~~~~~~~~~~~~~~~~~~~~~~~~ %s %d\n", req->uri, self->mssion.src_num);
         rtp_server_param_s param;
 
         memset(&param, 0, sizeof(rtp_server_param_s));

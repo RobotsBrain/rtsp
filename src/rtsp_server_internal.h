@@ -8,6 +8,7 @@ extern "C" {
 #define REQ_BUFFER          4096
 #define MAX_RTSP_WORKERS    20
 
+
 typedef struct rtsp_media_ {
     unsigned char   uri[128];
     unsigned short  client_port;

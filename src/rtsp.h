@@ -20,6 +20,7 @@ typedef enum {
     MULTICAST
 } TRANSPORT_CAST;
 
+
 typedef enum {
     ACCEPT_STR = 0,
     CONTENT_TYPE_STR,
@@ -28,6 +29,7 @@ typedef enum {
     SESSION_STR,
     TRANSPORT_STR
 } ATTR;
+
 
 typedef enum {
     DESCRIBE = 0,
@@ -38,14 +40,16 @@ typedef enum {
     OPTIONS
 } METHOD;
 
+
 typedef struct {
     METHOD          method;
-    char*           uri; /* Memory reserved in unpack_rtsp_req */
+    char*           uri;
     int             CSeq;
     unsigned int    Session;
     TRANSPORT_CAST  cast;
     unsigned short  client_port;
 } RTSP_REQUEST;
+
 
 typedef struct {
     int             code;
@@ -68,36 +72,51 @@ int pack_rtsp_req(RTSP_REQUEST *req, char *req_text, int text_size);
 
 int unpack_rtsp_res(RTSP_RESPONSE *res, char *res_text, int text_size);
 
+
 int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size);
 
+
 RTSP_REQUEST *rtsp_describe(const unsigned char *uri);
+
 
 RTSP_REQUEST *rtsp_setup(const unsigned char *uri, int Session, TRANSPORT_CAST cast,
 						unsigned short client_port);
 
+
 RTSP_REQUEST *rtsp_play(const unsigned char *uri, int Session);
+
 
 RTSP_REQUEST *rtsp_pause(const unsigned char *uri, int Session);
 
+
 RTSP_REQUEST *rtsp_teardown(const unsigned char *uri, int Session);
+
 
 RTSP_RESPONSE *rtsp_notfound(RTSP_REQUEST *req);
 
+
 RTSP_RESPONSE *rtsp_server_error(RTSP_REQUEST *req);
 
+
 RTSP_RESPONSE *rtsp_describe_res(RTSP_REQUEST *req, rtsp_stream_source_s* pssrc);
+
 
 RTSP_RESPONSE *rtsp_setup_res(RTSP_REQUEST *req, unsigned short server_port,
 								unsigned short client_port, TRANSPORT_CAST cast,
                                 int Session);
 
+
 RTSP_RESPONSE *rtsp_play_res(RTSP_REQUEST *req);
+
 
 RTSP_RESPONSE *rtsp_pause_res(RTSP_REQUEST *req);
 
+
 RTSP_RESPONSE *rtsp_teardown_res(RTSP_REQUEST *req);
 
+
 RTSP_RESPONSE *rtsp_options_res(RTSP_REQUEST *req);
+
 
 void rtsp_free_response(RTSP_RESPONSE **res);
 
