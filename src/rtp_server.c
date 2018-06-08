@@ -251,17 +251,24 @@ void* rtp_video_worker_proc(void* arg)
 
 int rtp_build_audio_pack(rtp_stream_worker_s* paswk, unsigned int ts, unsigned char *buffer, int size)
 {
+	int offset = 0;
+	char sedbuf[1600] = {0};
 	rtp_header_s rtp_header;
-	char sedbuf[2048] = {0};
 
-	rtp_build_header(&rtp_header, 97, paswk->seq, ts, paswk->ssrc);
+	do {
+		int snd_len = MIN(size, 1448);
 
-	memcpy(sedbuf, &rtp_header, sizeof(rtp_header_s));
-    memcpy(sedbuf + RTP_HEADER_SIZE, buffer, size);
+		rtp_build_header(&rtp_header, 97, paswk->seq, ts, paswk->ssrc);
 
-    rtp_send_av_data(paswk->sockfd, sedbuf, size + RTP_HEADER_SIZE);
+		memcpy(sedbuf, &rtp_header, sizeof(rtp_header_s));
+	    memcpy(sedbuf + RTP_HEADER_SIZE, buffer + offset, snd_len);
 
-    paswk->seq++;
+		rtp_send_av_data(paswk->sockfd, sedbuf, snd_len + RTP_HEADER_SIZE);
+
+		size -= snd_len;
+		offset += snd_len;
+		paswk->seq++;
+	} while(size > 0);
 
 	return 0;
 }

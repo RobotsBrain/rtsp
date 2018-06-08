@@ -129,7 +129,7 @@ int get_max_frame_size(void* thiz, rtsp_stream_identify_s* pidentify)
     int size = 0;
 
     if(pidentify->type == RTSP_STREAM_TYPE_AUDIO) {
-        size = 1024;
+        size = 4096;
     } else if(pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
         size = 200 * 1024;
     }
@@ -153,10 +153,10 @@ int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, rtsp_stream_in
         }
 
         sinfo->ts += 200;
-
-        memcpy(psvif->buf, sinfo->buf + sinfo->offset, 800);
-
         psvif->size = 800;
+
+        memcpy(psvif->buf, sinfo->buf + sinfo->offset, psvif->size);
+
         psvif->ts = sinfo->ts;
 
         sinfo->offset += psvif->size;
