@@ -33,7 +33,9 @@ typedef struct rtp_stream_worker_ {
 	int 			client_port;
 	unsigned short 	seq;
 	int 			ssrc;
-	pthread_t 		tid;	
+	pthread_t 		tid;
+	unsigned char* 	buf;
+	int 			max_frame_size;
 } rtp_stream_worker_s;
 
 
@@ -88,22 +90,20 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 	unsigned char nalu_header;
 	unsigned char fu_indic;
 	unsigned char fu_header;
-	unsigned char *p_nalu_data = NULL;
+	unsigned char *p_nalu_data = inbuffer + NALU_INDIC_SIZE;
 	unsigned char buffer[1500] = {0};
-	int data_left;
+	int data_left = frame_size - NALU_INDIC_SIZE;
 	int fu_start = 1;
 	int fu_end   = 0;
 	rtp_header_s rtp_header;
 
 	rtp_build_header(&rtp_header, 96, pvswk->seq, ts, pvswk->ssrc);
-	
-	data_left   = frame_size - NALU_INDIC_SIZE;
-	p_nalu_data = inbuffer + NALU_INDIC_SIZE;
 
 	//Single RTP Packet.
     if(data_left <= SINGLE_NALU_DATA_MAX) {
 	    rtp_header.seq_no = htons(pvswk->seq++);
-	    rtp_header.marker = 1;    
+	    rtp_header.marker = 1;
+
 		memcpy(buffer, &rtp_header, sizeof(rtp_header_s));
         memcpy(buffer + RTP_HEADER_SIZE, p_nalu_data, data_left);
 
@@ -151,7 +151,59 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 	return 0;	
 }
 
-#define BUF_SIZE 200 * 1024
+static int rtp_worker_init(rtp_server_hdl_s* prphdl, rtp_stream_worker_s* pswk, rtsp_stream_identify_s* pidentify)
+{
+	if(pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
+		pswk->max_frame_size = 200 * 1024;
+	} else if (pidentify->type == RTSP_STREAM_TYPE_AUDIO) {
+		pswk->max_frame_size = 2048;
+	}
+
+	pswk->sockfd = create_udp_connect(prphdl->server_ip, pswk->server_port, pswk->client_port);
+	if(pswk->sockfd < 0) {
+		return -1;
+	}
+
+	if(prphdl->stream_src.start != NULL) {
+		prphdl->stream_src.start(prphdl->stream_src.priv, pidentify);
+	}
+
+	if(prphdl->stream_src.get_max_frame_size != NULL) {
+		pswk->max_frame_size = prphdl->stream_src.get_max_frame_size(prphdl->stream_src.priv,
+																		pidentify);
+	}
+
+	pswk->buf = (unsigned char*)malloc(pswk->max_frame_size);
+	if(pswk->buf == NULL) {
+		printf("can not malloc memory!\n");
+		return -1;
+	}
+
+	pswk->start = 1;
+
+	return 0;
+}
+
+static int rtp_worker_uninit(rtp_server_hdl_s* prphdl, rtp_stream_worker_s* pswk, rtsp_stream_identify_s* pidentify)
+{printf("%p ~~~~~~~~~~~~~~~~2~~~~~~~~~~~~~~~\n", pswk->buf);
+	if(prphdl->stream_src.stop != NULL) {
+		prphdl->stream_src.stop(prphdl->stream_src.priv, pidentify);
+	}
+
+	if(pswk->buf != NULL) {
+		free(pswk->buf);
+		pswk->buf = NULL;
+	}
+
+	if(pswk->sockfd > 0) {
+		close(pswk->sockfd);
+		pswk->sockfd = -1;
+	}
+
+	memset(pswk, 0, sizeof(rtp_stream_worker_s));
+
+	return 0;
+}
 
 void* rtp_video_worker_proc(void* arg)
 {
@@ -159,34 +211,25 @@ void* rtp_video_worker_proc(void* arg)
 	rtsp_stream_identify_s identify;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	rtp_stream_worker_s* pvswk = (rtp_stream_worker_s*)&prphdl->vsworker;
-	unsigned char* buf = NULL;
 	
 	printf("[%s, %d] begin___\n", __FUNCTION__, __LINE__);
-
-	buf = (unsigned char*)malloc(BUF_SIZE);
-	if(buf == NULL) {
-		printf("can not malloc memory!\n");
-		return NULL;
-	}
-
-	pvswk->sockfd = create_udp_connect(prphdl->server_ip, pvswk->server_port, pvswk->client_port);
-	if(pvswk->sockfd < 0) {
-		return NULL;
-	}
-
-	pvswk->start = 1;
 
 	identify.type = RTSP_STREAM_TYPE_VIDEO;
 	identify.session_id = pvswk->ssrc;
 
+	if(rtp_worker_init(prphdl, pvswk, &identify) < 0) {
+		printf("end___, init rtp worker error!\n");
+		return NULL;
+	}
+
 	while(pvswk->start) {
 		if(prphdl->stream_src.get_next_frame != NULL) {
-			memset(buf, 0, BUF_SIZE);
+			memset(pvswk->buf, 0, pvswk->max_frame_size);
 
 			rtsp_stream_info_s vsinfo = {0};
 
-			vsinfo.buf = buf;
-			vsinfo.size = sizeof(buf);
+			vsinfo.buf = pvswk->buf;
+			vsinfo.size = pvswk->max_frame_size;
 
 			ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
 													&identify, &vsinfo);
@@ -200,10 +243,7 @@ void* rtp_video_worker_proc(void* arg)
 		}
 	}
 
-	free(buf);
-	buf = NULL;
-
-	close(pvswk->sockfd);
+	rtp_worker_uninit(prphdl, pvswk, &identify);
 
 	printf("[%s, %d] end___\n", __FUNCTION__, __LINE__);
 
@@ -233,28 +273,25 @@ void* rtp_audio_worker_proc(void* arg)
 	rtsp_stream_identify_s identify;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	rtp_stream_worker_s* paswk = (rtp_stream_worker_s*)&prphdl->asworker;
-	unsigned char buf[1600] = {0};
 	
 	printf("[%s, %d] begin___\n", __FUNCTION__, __LINE__);
-
-	paswk->sockfd = create_udp_connect(prphdl->server_ip, paswk->server_port, paswk->client_port);
-	if(paswk->sockfd < 0) {
-		return NULL;
-	}
-
-	paswk->start = 1;
 
 	identify.type = RTSP_STREAM_TYPE_AUDIO;
 	identify.session_id = paswk->ssrc;
 
+	if(rtp_worker_init(prphdl, paswk, &identify) < 0) {
+		printf("end___, init rtp worker error!\n");
+		return NULL;
+	}
+
 	while(paswk->start) {
 		if(prphdl->stream_src.get_next_frame != NULL) {
-			memset(buf, 0, sizeof(buf));
+			memset(paswk->buf, 0, paswk->max_frame_size);
 
 			rtsp_stream_info_s vsinfo = {0};
 
-			vsinfo.buf = buf;
-			vsinfo.size = sizeof(buf);
+			vsinfo.buf = paswk->buf;
+			vsinfo.size = paswk->max_frame_size;
 
 			ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
 													&identify, &vsinfo);
@@ -268,14 +305,14 @@ void* rtp_audio_worker_proc(void* arg)
 		}
 	}
 
-	close(paswk->sockfd);
+	rtp_worker_uninit(prphdl, paswk, &identify);
 
 	printf("[%s, %d] end___\n", __FUNCTION__, __LINE__);
 
 	return NULL;
 }
 
-int rtp_server_start_streaming(void* phdl, char* uri, rtp_server_stream_param_s* pparam)
+int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream_param_s* pparam)
 {
 	int ret = -1;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)phdl;
@@ -327,11 +364,9 @@ int rtp_server_stop_streaming(void* phdl)
 	printf("%s, %d  begin___\n", __FUNCTION__, __LINE__);
 
 	prphdl->asworker.start = 0;
-	close(prphdl->asworker.sockfd);
 	pthread_join(prphdl->asworker.tid, NULL);
 
 	prphdl->vsworker.start = 0;
-	close(prphdl->vsworker.sockfd);
 	pthread_join(prphdl->vsworker.tid, NULL);
 
 	printf("%s, %d  end___\n", __FUNCTION__, __LINE__);

@@ -60,7 +60,9 @@ int get_one_nalu(unsigned char *pBufIn, int nInSize, unsigned char *pNalu, int* 
     }
 
     *nNaluSize = nEndPos - nStartPos;
-    memcpy(pNalu, pBufIn + nStartPos, *nNaluSize);
+    memcpy((void*)pNalu, (void*)(pBufIn + nStartPos), *nNaluSize);
+
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~ %p, %d\n", pNalu, *nNaluSize);
 
     return 1;
 }
@@ -120,6 +122,23 @@ int get_sdp(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size)
     return 0;
 }
 
+int get_max_frame_size(void* thiz, rtsp_stream_identify_s* pidentify)
+{
+    if(thiz == NULL) {
+        return -1;
+    }
+
+    int size = 0;
+
+    if(pidentify->type == RTSP_STREAM_TYPE_AUDIO) {
+        size = 200 * 1024;
+    } else if(pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
+        size = 1024;
+    }
+
+    return size;
+}
+
 int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, rtsp_stream_info_s* psvif)
 {
     if(thiz == NULL) {
@@ -134,7 +153,6 @@ int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, rtsp_stream_in
         if(sinfo->offset >= sinfo->size) {
             sinfo->offset = 0;
         }
-
 
         sinfo->ts += 200;
 
@@ -240,10 +258,10 @@ int main(int argc, char **argv)
     strcpy(param.ipaddr, ipaddr);
     param.port = port;
     param.stream_src.priv = &testhdl;
-    param.stream_src.max_frame = 200 * 1024;
     param.stream_src.start = start;
     param.stream_src.stop = stop;
     param.stream_src.get_sdp = get_sdp;
+    param.stream_src.get_max_frame_size = get_max_frame_size;
     param.stream_src.get_next_frame = get_next_frame;
 
     get_file_info(vfile, &testhdl.vinfo);

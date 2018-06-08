@@ -28,7 +28,7 @@ int rtp_server_init(void **pphdl, rtp_server_param_s* pparam);
 int rtp_server_uninit(void **pphdl);
 
 
-int rtp_server_start_streaming(void* phdl, char* uri, rtp_server_stream_param_s* pparam);
+int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream_param_s* pparam);
 
 
 int rtp_server_stop_streaming(void* phdl);

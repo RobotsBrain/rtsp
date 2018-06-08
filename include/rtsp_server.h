@@ -35,13 +35,13 @@ typedef struct rtsp_stream_info_ {
 typedef struct rtsp_stream_source_ {
 	void* priv;
 
-	int max_frame;
-
 	int (*start)(void* thiz, rtsp_stream_identify_s* pidentify);
 
 	int (*stop)(void* thiz, rtsp_stream_identify_s* pidentify);
 
 	int (*get_sdp)(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size);
+
+	int (*get_max_frame_size)(void* thiz, rtsp_stream_identify_s* pidentify);
 
 	int (*get_next_frame)(void* thiz, rtsp_stream_identify_s* pidentify, rtsp_stream_info_s* psinfo);
 } rtsp_stream_source_s;
