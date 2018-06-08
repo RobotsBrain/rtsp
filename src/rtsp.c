@@ -19,7 +19,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define RTP_STR             "RTP/AVP\0"
 #define CLIENT_PORT_STR     "client_port=\0"
 #define SERVER_PORT_STR     "server_port=\0"
-#define OPTIONS_STR         "Public: DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE\0"
+#define OPTIONS_STR         "Public: DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE, OPTIONS, ANNOUNCE, RECORD\0"
 #define OK_STR              "OK\0"
 #define SERVERERROR_STR     "Internal server error\0"
 #define NOTFOUND_STR        "Not found\0"
@@ -93,7 +93,7 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
     case ACCEPT_STR:
         /* Only can send SDP */
         if (!strnstr(tok_start, SDP_STR, attr_len))
-            return(0);
+            return 0;
         break;
 
     case CSEQ_STR:
@@ -107,7 +107,7 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
     case TRANSPORT_STR:
         /* The only acceptable transport is RTP */
         if (!strnstr(tok_start, RTP_STR, attr_len)) {
-            return(0);
+            return 0;
         }
 
         /* Check if the transport is unicast or multicast */
@@ -116,19 +116,19 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
         } else if (strnstr(tok_start, CAST_STR[MULTICAST], attr_len)) {
             req->cast = MULTICAST;
         } else {
-            return(0);
+            return 0;
         }
 
         /* Get the client ports */
         if ( (tok_start = strnstr(tok_start, CLIENT_PORT_STR, attr_len)) ) {
             if (!tok_start) {
-                return(0);
+                return 0;
             }
 
             tok_start += strlen(CLIENT_PORT_STR);
             req->client_port = (unsigned short)atoi(tok_start);
             if (req->client_port == 0) {
-                return(0);
+                return 0;
             }
         }
         break;

@@ -185,7 +185,7 @@ static int rtp_worker_init(rtp_server_hdl_s* prphdl, rtp_stream_worker_s* pswk, 
 }
 
 static int rtp_worker_uninit(rtp_server_hdl_s* prphdl, rtp_stream_worker_s* pswk, rtsp_stream_identify_s* pidentify)
-{printf("%p ~~~~~~~~~~~~~~~~2~~~~~~~~~~~~~~~\n", pswk->buf);
+{
 	if(prphdl->stream_src.stop != NULL) {
 		prphdl->stream_src.stop(prphdl->stream_src.priv, pidentify);
 	}

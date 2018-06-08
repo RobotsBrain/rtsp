@@ -99,24 +99,37 @@ unsigned int random32(int type)
     return md_32((unsigned char *)&s, sizeof(s));
 }
 
-unsigned long random_seq()
+int create_udp_connect(const char *host, int server_port, int cliport)
 {
-    unsigned long seed;
+    struct sockaddr_in addr;
+    int sock = -1;
 
-    srand((unsigned)time(NULL));  
-    seed = 1 + (unsigned int)(rand()%(0xFFFF)); 
-    
-    return seed;
+    if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("socket");
+        return -1;
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(server_port);
+    addr.sin_addr.s_addr = inet_addr(host);
+
+    if (addr.sin_addr.s_addr == INADDR_NONE) {
+        printf("Incorrect ip address!");
+        close(sock);
+        return -1;
+    }
+
+    return sock;
 }
 
-int create_udp_connect(const char *host, int server_port, int cliport)
+int create_tcp_connect(const char *host, int server_port, int cliport)
 {
     int fd, reuse = 1;
     struct sockaddr_in server, rtp_address;
     int result = -1;
     int len = sizeof(struct sockaddr_in);
 
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    fd = socket(AF_INET, SOCK_STREAM, 0);
     if(fd < 0){
         return -1;
     }

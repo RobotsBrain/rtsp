@@ -21,9 +21,6 @@ char *strnstr(const char *s1, const char *s2, size_t n);
 unsigned int random32(int type);
 
 
-unsigned long random_seq();
-
-
 int create_udp_connect(const char *host, int port, int cliport);
 
 

@@ -62,7 +62,7 @@ int get_one_nalu(unsigned char *pBufIn, int nInSize, unsigned char *pNalu, int* 
     *nNaluSize = nEndPos - nStartPos;
     memcpy((void*)pNalu, (void*)(pBufIn + nStartPos), *nNaluSize);
 
-    printf("~~~~~~~~~~~~~~~~~~~~~~~~ %p, %d\n", pNalu, *nNaluSize);
+    // printf("~~~~~~~~~~~~~~~~~~~~~~~~ %p, %d\n", pNalu, *nNaluSize);
 
     return 1;
 }
@@ -287,4 +287,5 @@ int main(int argc, char **argv)
 }
 
 // ffplay rtsp://127.0.0.1:8554 -v debug
+// ffplay -rtsp_transport tcp rtsp://127.0.0.1:8554/live -v trace
 // ./cmake-build/out/test/test_rtsp_server -i 127.0.0.1 -v resource/liqin.h264 -a resource/liqin.g711u
