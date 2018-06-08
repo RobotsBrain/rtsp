@@ -13,6 +13,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #include <stdio.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include "utils.h"
 #include "rtsp.h"
@@ -123,81 +124,111 @@ RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *re
     return NULL;
 }
 
+int rtsp_deal_with_data(rtsp_server_hdl_s* prshdl, rtsp_server_worker_s* self,
+                        int sockfd, char* buf, int len)
+{
+    int ret = -1;
+    RTSP_REQUEST req[1];
+    RTSP_RESPONSE *res = NULL;
+
+    ret = rtsp_unpack_request(req, buf, len);
+    if(ret < 0) {
+        // do something
+    }
+
+    switch(req->method) {
+    case OPTIONS:
+        res = rtsp_server_options(self, req);
+        break;
+
+    case DESCRIBE:
+        res = rtsp_server_describe(self, req, &prshdl->stream_src);
+        break;
+
+    case SETUP:
+        res = rtsp_server_setup(self, req);
+        break;
+
+    case PLAY:
+        res = rtsp_server_play(self, req);
+        break;
+
+    case PAUSE:
+        res = rtsp_server_pause(self, req);
+        break;
+
+    case TEARDOWN:
+        res = rtsp_server_teardown(self, req);
+        break;
+
+    default:
+        res = rtsp_server_error(req);
+        break;
+    }
+
+    if(res) {
+        int len = rtsp_pack_response(res, buf, REQ_BUFFER);
+        if(len > 0) {
+            fprintf(stderr, "\n########################## RESPONSE\n%s\n", buf);
+            send(sockfd, buf, len, 0);
+        }
+        rtsp_free_response(&res);
+    }
+
+    if(req->uri != NULL) {
+        free(req->uri);
+        req->uri = NULL;
+    }
+
+    return 0;
+}
+
 void *rtsp_server_worker_proc(void *arg)
 {
     rtsp_server_worker_s* self = (rtsp_server_worker_s*)arg;
-    int sockfd = self->sockfd;
-    int st;
-    int CSeq = 0;
-    char buf[REQ_BUFFER] = {0};
-    RTSP_REQUEST req[1];
-    RTSP_RESPONSE *res = NULL;
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
+    int sockfd = self->sockfd;
+    int len = 0;
+    fd_set rfds, wfds;
+    struct timeval tv;
+    char buf[REQ_BUFFER] = {0};
 
     self->start = 1;
 
     while(self->start) {
-        memset(buf, 0, REQ_BUFFER);
-        memset(req, 0, sizeof(RTSP_REQUEST));
+        FD_ZERO(&rfds);
+        FD_ZERO(&wfds);
+        FD_SET(sockfd, &rfds);
+        FD_SET(sockfd, &wfds);
 
-        st = read(sockfd, buf, REQ_BUFFER);
-        if (st == -1) {
-            return NULL;
-        } else if(st == 0) {
+        tv.tv_sec = 5;
+        tv.tv_usec = 0;
+
+        int retval = select(sockfd + 1, &rfds, &wfds, NULL, &tv);
+        if (retval == -1) {
+            printf("select error: %s\n", strerror(errno));
             break;
+        } else if (retval == 0) {
+            continue;
         }
 
-        fprintf(stderr, "\n########################## RECEIVED\n%s", buf);
-        
-        st = rtsp_unpack_request(req, buf, st);
-        if(req->CSeq <= CSeq) {
-            res = rtsp_server_error(req);
-        } else {
-            CSeq = req->CSeq;
+        if (FD_ISSET(sockfd, &rfds)) {
+            bzero(buf, REQ_BUFFER);
 
-            switch(req->method) {
-            case OPTIONS:
-                res = rtsp_server_options(self, req);
-                break;
-
-            case DESCRIBE:
-                res = rtsp_server_describe(self, req, &prshdl->stream_src);
-                break;
-
-            case SETUP:
-                res = rtsp_server_setup(self, req);
-                break;
-
-            case PLAY:
-                res = rtsp_server_play(self, req);
-                break;
-
-            case PAUSE:
-                res = rtsp_server_pause(self, req);
-                break;
-
-            case TEARDOWN:
-                res = rtsp_server_teardown(self, req);
-                break;
-
-            default:
-                res = rtsp_server_error(req);
+            len = recv(sockfd, buf, REQ_BUFFER, 0);
+            if (len > 0) {
+                printf("\n########################## RECEIVED\n%s", buf);
+                rtsp_deal_with_data(prshdl, self, sockfd, buf, len); 
+            } else if (len < 0) {
+                printf("errno: %d, msg: %s\n", errno, strerror(errno));
+            } else {
+                printf("exit\n");
                 break;
             }
         }
 
-        if(res) {
-            st = rtsp_pack_response(res, buf, REQ_BUFFER);
-            if (st) {
-                fprintf(stderr, "\n########################## RESPONSE\n%s\n", buf);
-                send(sockfd, buf, st, 0);
-            }
-            rtsp_free_response(&res);
-        }
-
-        if(req->uri != NULL) {
-            free(req->uri);
-            req->uri = NULL;
+        if (FD_ISSET(sockfd, &wfds)) {
+            // rtp over tcp, send data
         }
     }
 
