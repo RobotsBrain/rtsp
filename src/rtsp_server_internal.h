@@ -1,6 +1,10 @@
 #ifndef __RTSP_SERVER_INTERNAL_H__
 #define __RTSP_SERVER_INTERNAL_H__
 
+#include "rtsp.h"
+
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -10,9 +14,12 @@ extern "C" {
 
 
 typedef struct rtsp_media_ {
-    unsigned char   uri[128];
-    unsigned short  client_port;
-    unsigned short  server_port;
+    unsigned char           uri[128];
+    unsigned short          client_port;
+    unsigned short          server_port;
+    unsigned short          data_itl;
+    unsigned short          ctr_itl;
+    RTSP_TRANSPORT_MODE_E   tmode;
 } rtsp_media_s;
 
 
@@ -25,11 +32,13 @@ typedef struct rtsp_session_ {
 
 typedef struct rtsp_server_worker_ {
     char                    start;
+    char                    play;
     int                     used;
     int                     sockfd;
     pthread_t               tid;
     rtsp_session_s          mssion;
     struct sockaddr_storage client_addr;
+    RTSP_TRANSPORT_MODE_E   tmode;
     void*           		prtphdl;
     void*                   pcontext;
 } rtsp_server_worker_s;

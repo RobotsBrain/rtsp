@@ -30,6 +30,8 @@ typedef struct rtp_stream_worker_ {
 	int 			sockfd;
 	int 			server_port;
 	int 			client_port;
+	unsigned short  data_itl;
+    unsigned short  ctr_itl; 
 	unsigned short 	seq;
 	int 			ssrc;
 	pthread_t 		tid;
@@ -338,22 +340,36 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 		parse_domain_ip_address(address, prphdl->server_ip);
 	}
 
-	if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
-		prphdl->vsworker.ssrc = random32(0);
-		prphdl->vsworker.server_port = pparam->server_port;
-		prphdl->vsworker.client_port = pparam->client_port;
+	if(pparam->tmode == RTSP_TRANSPORT_MODE_UDP) {
+		if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
+			prphdl->vsworker.ssrc = random32(0);
+			prphdl->vsworker.server_port = pparam->server_port;
+			prphdl->vsworker.client_port = pparam->client_port;
 
-		ret = pthread_create(&prphdl->vsworker.tid, NULL, rtp_video_worker_proc, prphdl);
-	} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
-		prphdl->asworker.ssrc = random32(0);
-		prphdl->asworker.server_port = pparam->server_port;
-		prphdl->asworker.client_port = pparam->client_port;
+			ret = pthread_create(&prphdl->vsworker.tid, NULL, rtp_video_worker_proc, prphdl);
+		} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
+			prphdl->asworker.ssrc = random32(0);
+			prphdl->asworker.server_port = pparam->server_port;
+			prphdl->asworker.client_port = pparam->client_port;
 
-		ret = pthread_create(&prphdl->asworker.tid, NULL, rtp_audio_worker_proc, prphdl);
-	}
+			ret = pthread_create(&prphdl->asworker.tid, NULL, rtp_audio_worker_proc, prphdl);
+		}
 
-	if(ret != 0) {
-		printf("ret: %d, create thread fail!\n", ret);
+		if(ret != 0) {
+			printf("ret: %d, create thread fail!\n", ret);
+		}
+	} else if (pparam->tmode == RTSP_TRANSPORT_MODE_TCP) {
+		if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
+			prphdl->vsworker.ssrc = random32(0);
+			prphdl->vsworker.data_itl = pparam->data_itl;
+			prphdl->vsworker.ctr_itl = pparam->ctr_itl;
+		} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
+			prphdl->asworker.ssrc = random32(0);
+			prphdl->asworker.data_itl = pparam->data_itl;
+			prphdl->asworker.ctr_itl = pparam->ctr_itl;
+		}
+
+		ret = 0;
 	}
 
 	return ret;

@@ -40,7 +40,7 @@ RTSP_RESPONSE *rtsp_server_describe(rtsp_server_worker_s *self, RTSP_REQUEST *re
 RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     RTSP_RESPONSE *res = NULL;
-    // rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
+    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     if(self->mssion.src_num > 2) {
         return NULL;
@@ -62,11 +62,20 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 
             int index = self->mssion.src_num;
 
+            self->mssion.medias[index].tmode = req->tmode;
+
             memcpy(self->mssion.medias[index].uri, req->uri, strlen(req->uri));
-            self->mssion.medias[index].client_port = req->client_port;
-            self->mssion.medias[index].server_port = req->client_port + 1000;
+
+            if(req->tmode == RTSP_TRANSPORT_MODE_UDP) {
+                self->mssion.medias[index].client_port = req->client_port;
+                self->mssion.medias[index].server_port = req->client_port + 1000;
+            } else if(req->tmode == RTSP_TRANSPORT_MODE_TCP) {
+                self->mssion.medias[index].data_itl = req->data_itl;
+                self->mssion.medias[index].ctr_itl = req->data_itl + 1;
+            }
 
             self->mssion.src_num++;
+            prshdl->tmode = req->tmode;
 
             res = rtsp_setup_res(req, self->mssion.medias[index].server_port, 0, UNICAST, 0);
         
@@ -102,8 +111,15 @@ RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
                 sparam.type = RTSP_STREAM_TYPE_AUDIO;
             }
 
-            sparam.server_port = self->mssion.medias[i].server_port;
-            sparam.client_port = self->mssion.medias[i].client_port;
+            if(self->mssion.medias[i].tmode == RTSP_TRANSPORT_MODE_UDP) {
+                sparam.server_port = self->mssion.medias[i].server_port;
+                sparam.client_port = self->mssion.medias[i].client_port;
+            } else if(self->mssion.medias[i].tmode == RTSP_TRANSPORT_MODE_TCP) {
+                sparam.data_itl = self->mssion.medias[i].data_itl;
+                sparam.ctr_itl = self->mssion.medias[i].ctr_itl;
+            }
+
+            sparam.tmode = self->mssion.medias[i].tmode;
 
             rtp_server_start_streaming(self->prtphdl, self->mssion.medias[i].uri, &sparam);
         }
@@ -151,6 +167,9 @@ int rtsp_deal_with_data(rtsp_server_hdl_s* prshdl, rtsp_server_worker_s* self,
 
     case PLAY:
         res = rtsp_server_play(self, req);
+        if(res != NULL) {
+            prshdl->play = 1;
+        }
         break;
 
     case PAUSE:
@@ -229,6 +248,9 @@ void *rtsp_server_worker_proc(void *arg)
 
         if (FD_ISSET(sockfd, &wfds)) {
             // rtp over tcp, send data
+            if(prshdl->tmode == RTSP_TRANSPORT_MODE_TCP && prshdl->play == 1) {
+                
+            }
         }
     }
 

@@ -2,6 +2,7 @@
 #define __RTP_SERVER_H__
 
 #include "rtsp_server.h"
+#include "rtsp.h"
 #include "rtp.h"
 
 
@@ -16,9 +17,12 @@ typedef struct rtp_param_ {
 
 
 typedef struct rtp_server_stream_param_ {
-	int					server_port;
-	int					client_port;
-	RTSP_STREAM_TYPE_E	type;
+	int						server_port;
+	int						client_port;
+	int						data_itl;
+	int						ctr_itl;
+	RTSP_STREAM_TYPE_E		type;
+	RTSP_TRANSPORT_MODE_E   tmode;
 } rtp_server_stream_param_s;
 
 
