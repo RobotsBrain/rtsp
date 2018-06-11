@@ -250,7 +250,7 @@ void *rtsp_server_worker_proc(void *arg)
         if (FD_ISSET(sockfd, &wfds)) {
             // rtp over tcp, send data
             if(self->tmode == RTSP_TRANSPORT_MODE_TCP && self->play == 1) {
-
+                rtp_server_stream_data(self->prtphdl);
             }
         }
     }
