@@ -268,8 +268,8 @@ int rtsp_unpack_request(RTSP_REQUEST *req, char *req_text, int text_size)
         return -1;
     }
 
-    /* client_port must be present if the method is SETUP */
-    if (req->client_port == 0 && req->method == SETUP) {
+    if (req->tmode == RTSP_TRANSPORT_MODE_UDP && req->client_port == 0
+        && req->method == SETUP) {
         free(req->uri);
         req->uri = NULL;
         return -1;
