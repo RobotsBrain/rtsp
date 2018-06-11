@@ -16,7 +16,9 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define RTSP_STR            "RTSP/1.0\0"
 #define RTSP_URI            "rtsp://\0"
 #define SDP_STR             "application/sdp\0"
-#define RTP_STR             "RTP/AVP\0"
+#define RTP_UDP_STR         "RTP/AVP/UDP\0"
+#define RTP_TCP_STR         "RTP/AVP/TCP\0"
+#define INTERLEAVED_STR     "interleaved\0"
 #define CLIENT_PORT_STR     "client_port=\0"
 #define SERVER_PORT_STR     "server_port=\0"
 #define OPTIONS_STR         "Public: DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE, OPTIONS, ANNOUNCE, RECORD\0"
@@ -106,8 +108,14 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
 
     case TRANSPORT_STR:
         /* The only acceptable transport is RTP */
-        if (!strnstr(tok_start, RTP_STR, attr_len)) {
-            return 0;
+        if(strnstr(tok_start, RTP_UDP_STR, attr_len) != 0) {
+            req->tmode = RTSP_TRANSPORT_MODE_UDP;
+        } else {
+            if(strnstr(tok_start, RTP_TCP_STR, attr_len) != 0) {
+                req->tmode = RTSP_TRANSPORT_MODE_TCP;
+            } else {
+                return 0;
+            }
         }
 
         if (strnstr(tok_start, CAST_STR[UNICAST], attr_len)) {
@@ -118,15 +126,26 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
             return 0;
         }
 
-        if ( (tok_start = strnstr(tok_start, CLIENT_PORT_STR, attr_len)) ) {
-            if (!tok_start) {
-                return 0;
-            }
+        if(req->tmode == RTSP_TRANSPORT_MODE_UDP) {
+            if((tok_start = strnstr(tok_start, CLIENT_PORT_STR, attr_len))) {
+                if (!tok_start) {
+                    return 0;
+                }
 
-            tok_start += strlen(CLIENT_PORT_STR);
-            req->client_port = (unsigned short)atoi(tok_start);
-            if (req->client_port == 0) {
-                return 0;
+                tok_start += strlen(CLIENT_PORT_STR);
+                req->client_port = (unsigned short)atoi(tok_start);
+                if (req->client_port == 0) {
+                    return 0;
+                }
+            }
+        } else if (req->tmode == RTSP_TRANSPORT_MODE_TCP) {
+            if((tok_start = strnstr(tok_start, INTERLEAVED_STR, attr_len))) {
+                if (!tok_start) {
+                    return 0;
+                }
+
+                tok_start += strlen(INTERLEAVED_STR);
+                req->data_itl = (unsigned short)atoi(tok_start);
             }
         }
         break;
@@ -323,12 +342,22 @@ int rtsp_pack_response(RTSP_RESPONSE *res, char *res_text, int text_size)
         written += ret;
     }
 
-    /* Write client and server ports*/
-    if (res->client_port && res->server_port) {
+    if(res->tmode == RTSP_TRANSPORT_MODE_UDP) {
+        if (res->client_port && res->server_port) {
+            ret = snprintf(res_text + written, text_size - written, \
+                "Transport: RTP/AVP/UDP;%s;client_port=%d-%d;server_port=%d-%d\r\n", \
+                CAST_STR[res->cast], res->client_port, res->client_port + 1, \
+                res->server_port, res->server_port + 1);
+            if (ret < 0 || ret >= text_size - written) {
+                return 0;
+            }
+
+            written += ret;
+        }
+    } else if(res->tmode == RTSP_TRANSPORT_MODE_TCP) {
         ret = snprintf(res_text + written, text_size - written, \
-            "Transport: RTP/AVP;%s;client_port=%d-%d;server_port=%d-%d\r\n", \
-            CAST_STR[res->cast], res->client_port, res->client_port + 1, \
-            res->server_port, res->server_port + 1);
+            "Transport: RTP/AVP/TCP;%s;interleaved=%d-%d\r\n", \
+            CAST_STR[res->cast], res->data_itl, res->data_itl + 1);
         if (ret < 0 || ret >= text_size - written) {
             return 0;
         }
@@ -380,8 +409,16 @@ RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cas
     res->CSeq = req->CSeq;
     res->Session = Session ? Session : req->Session;
     res->cast = cast ? cast : req->cast;
-    res->client_port = client_port ? client_port : req->client_port;
-    res->server_port = server_port;
+    res->tmode = req->tmode;
+
+    if(req->tmode == RTSP_TRANSPORT_MODE_UDP) {
+        res->client_port = client_port ? client_port : req->client_port;
+        res->server_port = server_port;
+    } else if(req->tmode == RTSP_TRANSPORT_MODE_TCP) {
+        res->data_itl = req->data_itl;
+        res->ctr_itl = req->data_itl + 1;
+    }
+    
     res->Content_Length = Content_Length;
 
     if(Content_Length > 0 && content != NULL) {

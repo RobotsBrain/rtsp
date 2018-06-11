@@ -41,26 +41,37 @@ typedef enum {
 } METHOD;
 
 
+typedef enum {
+    RTSP_TRANSPORT_MODE_UDP,
+    RTSP_TRANSPORT_MODE_TCP,
+} RTSP_TRANSPORT_MODE_E;
+
+
 typedef struct {
-    METHOD          method;
-    char*           uri;
-    int             CSeq;
-    unsigned int    Session;
-    TRANSPORT_CAST  cast;
-    unsigned short  client_port;
+    METHOD                  method;
+    char*                   uri;
+    int                     CSeq;
+    unsigned int            Session;
+    TRANSPORT_CAST          cast;
+    RTSP_TRANSPORT_MODE_E   tmode;
+    unsigned short          data_itl;   // interleaved
+    unsigned short          client_port;
 } RTSP_REQUEST;
 
 
 typedef struct {
-    int             code;
-    int             CSeq;
-    unsigned int    Session;
-    TRANSPORT_CAST  cast;
-    unsigned short  client_port;
-    unsigned short  server_port;
-    int             Content_Length;
-    char*           content;
-    int             options;
+    int                     code;
+    int                     CSeq;
+    unsigned int            Session;
+    TRANSPORT_CAST          cast;
+    RTSP_TRANSPORT_MODE_E   tmode;
+    unsigned short          client_port;
+    unsigned short          server_port;
+    unsigned short          data_itl;   // interleaved
+    unsigned short          ctr_itl;    // interleaved
+    int                     Content_Length;
+    char*                   content;
+    int                     options;
 } RTSP_RESPONSE;
 
 
