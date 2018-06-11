@@ -21,6 +21,7 @@ typedef struct rtp_server_stream_param_ {
 	int						client_port;
 	int						data_itl;
 	int						ctr_itl;
+	int 					sockfd;
 	RTSP_STREAM_TYPE_E		type;
 	RTSP_TRANSPORT_MODE_E   tmode;
 } rtp_server_stream_param_s;
@@ -36,6 +37,9 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 
 
 int rtp_server_stop_streaming(void* phdl);
+
+
+int rtp_server_stream_data(void* phdl);
 
 
 #ifdef __cplusplus

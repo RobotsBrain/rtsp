@@ -40,7 +40,7 @@ RTSP_RESPONSE *rtsp_server_describe(rtsp_server_worker_s *self, RTSP_REQUEST *re
 RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     RTSP_RESPONSE *res = NULL;
-    rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
+    // rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     if(self->mssion.src_num > 2) {
         return NULL;
@@ -75,7 +75,7 @@ RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
             }
 
             self->mssion.src_num++;
-            prshdl->tmode = req->tmode;
+            self->tmode = req->tmode;
 
             res = rtsp_setup_res(req, self->mssion.medias[index].server_port, 0, UNICAST, 0);
         
@@ -120,6 +120,7 @@ RTSP_RESPONSE *rtsp_server_play(rtsp_server_worker_s *self, RTSP_REQUEST *req)
             }
 
             sparam.tmode = self->mssion.medias[i].tmode;
+            sparam.sockfd = self->sockfd;
 
             rtp_server_start_streaming(self->prtphdl, self->mssion.medias[i].uri, &sparam);
         }
@@ -168,7 +169,7 @@ int rtsp_deal_with_data(rtsp_server_hdl_s* prshdl, rtsp_server_worker_s* self,
     case PLAY:
         res = rtsp_server_play(self, req);
         if(res != NULL) {
-            prshdl->play = 1;
+            self->play = 1;
         }
         break;
 
@@ -248,8 +249,8 @@ void *rtsp_server_worker_proc(void *arg)
 
         if (FD_ISSET(sockfd, &wfds)) {
             // rtp over tcp, send data
-            if(prshdl->tmode == RTSP_TRANSPORT_MODE_TCP && prshdl->play == 1) {
-                
+            if(self->tmode == RTSP_TRANSPORT_MODE_TCP && self->play == 1) {
+
             }
         }
     }

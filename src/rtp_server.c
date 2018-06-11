@@ -361,10 +361,12 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 	} else if (pparam->tmode == RTSP_TRANSPORT_MODE_TCP) {
 		if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
 			prphdl->vsworker.ssrc = random32(0);
+			prphdl->vsworker.sockfd = pparam->sockfd;
 			prphdl->vsworker.data_itl = pparam->data_itl;
 			prphdl->vsworker.ctr_itl = pparam->ctr_itl;
 		} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
 			prphdl->asworker.ssrc = random32(0);
+			prphdl->asworker.sockfd = pparam->sockfd;
 			prphdl->asworker.data_itl = pparam->data_itl;
 			prphdl->asworker.ctr_itl = pparam->ctr_itl;
 		}
@@ -392,6 +394,18 @@ int rtp_server_stop_streaming(void* phdl)
 	pthread_join(prphdl->vsworker.tid, NULL);
 
 	printf("%s, %d  end___\n", __FUNCTION__, __LINE__);
+
+	return 0;
+}
+
+int rtp_server_stream_data(void* phdl)
+{
+	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)phdl;
+
+	if(prphdl == NULL) {
+		return -1;
+	}
+
 
 	return 0;
 }
