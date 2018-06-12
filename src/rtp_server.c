@@ -206,7 +206,7 @@ static int rtp_worker_uninit(rtp_server_hdl_s* prphdl, rtp_stream_worker_s* pswk
 		pswk->buf = NULL;
 	}
 
-	if(pswk->sockfd > 0) {
+	if(pswk->sockfd > 0 && pswk->tmode == RTSP_TRANSPORT_MODE_UDP) {
 		close(pswk->sockfd);
 		pswk->sockfd = -1;
 	}
@@ -216,9 +216,39 @@ static int rtp_worker_uninit(rtp_server_hdl_s* prphdl, rtp_stream_worker_s* pswk
 	return 0;
 }
 
-void* rtp_video_worker_proc(void* arg)
+int rtp_server_pack_send_av_stream(rtp_server_hdl_s* prphdl, rtp_stream_worker_s* pworker,
+									rtsp_stream_identify_s* pidentify)
 {
 	int ret = -1;
+	rtsp_stream_info_s vsinfo = {0};
+
+	if(prphdl->stream_src.get_next_frame == NULL) {
+		return -1;
+	}
+
+	memset(pworker->buf, 0, pworker->max_frame_size);
+
+	vsinfo.buf = pworker->buf;
+	vsinfo.size = pworker->max_frame_size;
+
+	ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv, pidentify, &vsinfo);
+	if(ret == 0 && vsinfo.size > 0) {
+		if(pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
+			ret = rtp_build_nalu(pworker, vsinfo.ts, vsinfo.buf, vsinfo.size);
+		} else if (pidentify->type == RTSP_STREAM_TYPE_AUDIO) {
+			ret = rtp_build_audio_pack(pworker, vsinfo.ts, vsinfo.buf, vsinfo.size);
+		}
+	}
+
+	if(ret < 0) {
+		// try to sleep some time
+	}
+
+	return 0;
+}
+
+void* rtp_video_worker_proc(void* arg)
+{
 	rtsp_stream_identify_s identify;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	rtp_stream_worker_s* pvswk = (rtp_stream_worker_s*)&prphdl->vsworker;
@@ -234,24 +264,7 @@ void* rtp_video_worker_proc(void* arg)
 	}
 
 	while(pvswk->start) {
-		if(prphdl->stream_src.get_next_frame != NULL) {
-			memset(pvswk->buf, 0, pvswk->max_frame_size);
-
-			rtsp_stream_info_s vsinfo = {0};
-
-			vsinfo.buf = pvswk->buf;
-			vsinfo.size = pvswk->max_frame_size;
-
-			ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
-													&identify, &vsinfo);
-			if(ret == 0 && vsinfo.size > 0) {
-				ret = rtp_build_nalu(pvswk, vsinfo.ts, vsinfo.buf, vsinfo.size);
-			}
-			
-			if(ret < 0) {
-				// try to sleep some time
-			}
-		}
+		rtp_server_pack_send_av_stream(prphdl, pvswk, &identify);
 	}
 
 	rtp_worker_uninit(prphdl, pvswk, &identify);
@@ -299,7 +312,6 @@ int rtp_build_audio_pack(rtp_stream_worker_s* paswk, unsigned int ts, unsigned c
 
 void* rtp_audio_worker_proc(void* arg)
 {
-	int ret = -1;
 	rtsp_stream_identify_s identify;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)arg;
 	rtp_stream_worker_s* paswk = (rtp_stream_worker_s*)&prphdl->asworker;
@@ -315,24 +327,7 @@ void* rtp_audio_worker_proc(void* arg)
 	}
 
 	while(paswk->start) {
-		if(prphdl->stream_src.get_next_frame != NULL) {
-			memset(paswk->buf, 0, paswk->max_frame_size);
-
-			rtsp_stream_info_s vsinfo = {0};
-
-			vsinfo.buf = paswk->buf;
-			vsinfo.size = paswk->max_frame_size;
-
-			ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
-													&identify, &vsinfo);
-			if(ret == 0 && vsinfo.size > 0) {
-				ret = rtp_build_audio_pack(paswk, vsinfo.ts, vsinfo.buf, vsinfo.size);
-			}
-			
-			if(ret < 0) {
-				// try to sleep some time
-			}
-		}
+		rtp_server_pack_send_av_stream(prphdl, paswk, &identify);
 	}
 
 	rtp_worker_uninit(prphdl, paswk, &identify);
@@ -439,6 +434,7 @@ int rtp_server_stop_streaming(void* phdl)
 int rtp_server_stream_data(void* phdl)
 {
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)phdl;
+	rtsp_stream_identify_s identify;
 
 	if(prphdl == NULL) {
 		return -1;
@@ -446,7 +442,6 @@ int rtp_server_stream_data(void* phdl)
 
 	// video
 	{
-		rtsp_stream_identify_s identify;
 		rtp_stream_worker_s* pvswk = (rtp_stream_worker_s*)&prphdl->vsworker;
 
 		identify.type = RTSP_STREAM_TYPE_VIDEO;
@@ -457,23 +452,11 @@ int rtp_server_stream_data(void* phdl)
 			return -1;
 		}
 
-		memset(pvswk->buf, 0, pvswk->max_frame_size);
-
-		rtsp_stream_info_s vsinfo = {0};
-
-		vsinfo.buf = pvswk->buf;
-		vsinfo.size = pvswk->max_frame_size;
-
-		int ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
-												&identify, &vsinfo);
-		if(ret == 0 && vsinfo.size > 0) {
-			ret = rtp_build_nalu(pvswk, vsinfo.ts, vsinfo.buf, vsinfo.size);
-		}
+		rtp_server_pack_send_av_stream(prphdl, pvswk, &identify);
 	}
 
 	// audio
 	{
-		rtsp_stream_identify_s identify;
 		rtp_stream_worker_s* paswk = (rtp_stream_worker_s*)&prphdl->asworker;
 
 		identify.type = RTSP_STREAM_TYPE_AUDIO;
@@ -484,18 +467,7 @@ int rtp_server_stream_data(void* phdl)
 			return -1;
 		}
 
-		memset(paswk->buf, 0, paswk->max_frame_size);
-
-		rtsp_stream_info_s vsinfo = {0};
-
-		vsinfo.buf = paswk->buf;
-		vsinfo.size = paswk->max_frame_size;
-
-		int ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
-												&identify, &vsinfo);
-		if(ret == 0 && vsinfo.size > 0) {
-			ret = rtp_build_audio_pack(paswk, vsinfo.ts, vsinfo.buf, vsinfo.size);
-		}
+		rtp_server_pack_send_av_stream(prphdl, paswk, &identify);
 	}
 
 	return 0;
