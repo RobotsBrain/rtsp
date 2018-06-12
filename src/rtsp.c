@@ -146,7 +146,6 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
 
                 tok_start += strlen(INTERLEAVED_STR);
                 req->data_itl = (unsigned short)atoi(tok_start);
-                printf("%s, %d  (%s) ~~~~~~~~~~~~~~~~~~~~~~ %d\n", __FUNCTION__, __LINE__, tok_start, req->data_itl);
             }
         }
         break;
@@ -418,7 +417,6 @@ RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cas
     } else if(req->tmode == RTSP_TRANSPORT_MODE_TCP) {
         res->data_itl = req->data_itl;
         res->ctr_itl = req->data_itl + 1;
-printf("%s, %d ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ %d\n", __FUNCTION__, __LINE__, req->data_itl);
     }
     
     res->Content_Length = Content_Length;
