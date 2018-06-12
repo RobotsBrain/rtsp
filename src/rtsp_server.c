@@ -272,6 +272,8 @@ int rtsp_worker_create(rtsp_server_hdl_s* prshdl, int sockfd,
     int ret = -1;
     int i = 0;
 
+    printf("begin___, client sockfd(%d)!\n", sockfd);
+
     do {
         for(i = 0; i < MAX_RTSP_WORKERS; ++i) {
             if (prshdl->workers[i].used == 0) {
@@ -301,6 +303,8 @@ int rtsp_worker_create(rtsp_server_hdl_s* prshdl, int sockfd,
         prshdl->workers[i].used = 1;
         ret = 0;
     } while(0);
+
+    printf("end___\n");
 
     return ret;
 }

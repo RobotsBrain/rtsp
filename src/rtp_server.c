@@ -51,41 +51,18 @@ typedef struct rtp_handle_ {
 int rtp_send_av_data(int fd, const void *buf, size_t count)
 {
 	int ret = -1;
-	size_t size = write(fd, buf, count);
+	size_t size = 0;
+
+	size = write(fd, buf, count);
+	// size = send(fd, buf, count, 0);
 	if(size == count) {
+		// printf("sock(%d) send %d bytes data!\n", fd, size);
 		ret = 0;
 	}
 
 	return ret;
 }
 
-/*******************************************************************************
- * RTP Packet:
- * 1. NALU length small than 1460-sizeof(RTP header):
- *    (RTP Header) + (NALU without Start Code)
- * 2. NALU length larger than MTU:
- *    (RTP Header) + (FU Indicator) + (FU Header) + (NALU Slice)
- *                 + (FU Indicator) + (FU Header) + (NALU Slice)
- *                 + ...
- *
- * inbuffer--NALU: 00 00 00 01      1 Byte     XX XX XX
- *                | Start Code| |NALU Header| |NALU Data|
- *
- * NALU Slice: Cut NALU Data into Slice.
- *
- * NALU Header: F|NRI|TYPE
- *              F: 1 bit,
- *              NRI: 2 bits,
- *              Type: 5 bits
- *
- * FU Indicator: Like NALU Header, Type is FU-A(28)
- * 
- * FU Header: S|E|R|Type
- *            S: 1 bit, Start, First Slice should set
- *            E: 1 bit, End, Last Slice should set
- *            R: 1 bit, Reserved
- *            Type: 5 bits, Same with NALU Header's Type.
- ******************************************************************************/
 int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *inbuffer, int frame_size)
 {
 	unsigned char nalu_header;
@@ -160,9 +137,12 @@ static int rtp_worker_init(rtp_server_hdl_s* prphdl, rtp_stream_worker_s* pswk, 
 		pswk->max_frame_size = 2048;
 	}
 
-	pswk->sockfd = create_udp_connect(prphdl->server_ip, pswk->server_port, pswk->client_port);
-	if(pswk->sockfd < 0) {
-		return -1;
+	if(pswk->sockfd <= 0) {
+		pswk->sockfd = create_udp_connect(prphdl->server_ip, pswk->server_port,
+											pswk->client_port);
+		if(pswk->sockfd < 0) {
+			return -1;
+		}
 	}
 
 	if(prphdl->stream_src.start != NULL) {
@@ -371,6 +351,8 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 			prphdl->asworker.ctr_itl = pparam->ctr_itl;
 		}
 
+		printf("set stream sockfd(%d)\n", pparam->sockfd);
+
 		ret = 0;
 	}
 
@@ -406,6 +388,32 @@ int rtp_server_stream_data(void* phdl)
 		return -1;
 	}
 
+	// video
+	{
+		rtsp_stream_identify_s identify;
+		rtp_stream_worker_s* pvswk = (rtp_stream_worker_s*)&prphdl->vsworker;
+
+		identify.type = RTSP_STREAM_TYPE_VIDEO;
+		identify.session_id = pvswk->ssrc;
+
+		if(pvswk->start != 1 && rtp_worker_init(prphdl, pvswk, &identify) < 0) {
+			printf("end___, init rtp worker error!\n");
+			return NULL;
+		}
+
+		memset(pvswk->buf, 0, pvswk->max_frame_size);
+
+		rtsp_stream_info_s vsinfo = {0};
+
+		vsinfo.buf = pvswk->buf;
+		vsinfo.size = pvswk->max_frame_size;
+
+		int ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
+												&identify, &vsinfo);
+		if(ret == 0 && vsinfo.size > 0) {
+			ret = rtp_build_nalu(pvswk, vsinfo.ts, vsinfo.buf, vsinfo.size);
+		}
+	}
 
 	return 0;
 }
