@@ -304,6 +304,7 @@ void* rtp_audio_worker_proc(void* arg)
 int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream_param_s* pparam)
 {
 	int ret = -1;
+	rtp_stream_worker_s* pworker = NULL;
 	rtp_server_hdl_s* prphdl = (rtp_server_hdl_s*)phdl;
 
 	if(prphdl == NULL) {
@@ -322,34 +323,34 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 	}
 
 	if(pparam->tmode == RTSP_TRANSPORT_MODE_UDP) {
+		typedef void *(*start_routine)(void *);
+		start_routine thread_proc = NULL;
+		pthread_t* ptid = NULL;
+
 		if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
-			prphdl->vsworker.ssrc = random32(0);
-			prphdl->vsworker.server_port = pparam->server_port;
-			prphdl->vsworker.client_port = pparam->client_port;
-
-			ret = pthread_create(&prphdl->vsworker.tid, NULL, rtp_video_worker_proc, prphdl);
+			pworker = &prphdl->vsworker;
+			ptid = &prphdl->vsworker.tid;
+			thread_proc = rtp_video_worker_proc;
 		} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
-			prphdl->asworker.ssrc = random32(0);
-			prphdl->asworker.server_port = pparam->server_port;
-			prphdl->asworker.client_port = pparam->client_port;
-
-			ret = pthread_create(&prphdl->asworker.tid, NULL, rtp_audio_worker_proc, prphdl);
+			pworker = &prphdl->asworker;
+			ptid = &prphdl->asworker.tid;
+			thread_proc = rtp_audio_worker_proc;
 		}
 
+		pworker->server_port = pparam->server_port;
+		pworker->client_port = pparam->client_port;
+
+		ret = pthread_create(ptid, NULL, thread_proc, prphdl);
 		if(ret != 0) {
 			printf("ret: %d, create thread fail!\n", ret);
 		}
 	} else if (pparam->tmode == RTSP_TRANSPORT_MODE_TCP) {
-		rtp_stream_worker_s* pworker = NULL;
-
 		if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
 			pworker = &prphdl->vsworker;
 		} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
 			pworker = &prphdl->asworker;
 		}
 
-		pworker->ssrc = random32(0);
-		pworker->tmode = pparam->tmode;
 		pworker->sockfd = pparam->sockfd;
 		pworker->data_itl = pparam->data_itl;
 		pworker->ctr_itl = pparam->ctr_itl;
@@ -357,6 +358,11 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 		printf("set stream sockfd(%d)\n", pparam->sockfd);
 
 		ret = 0;
+	}
+
+	if(ret == 0) {
+		pworker->ssrc = random32(0);
+		pworker->tmode = pparam->tmode;
 	}
 
 	return ret;
