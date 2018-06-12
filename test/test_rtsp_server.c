@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
+#include <signal.h>
 
 #include "rtsp_server.h"
 
@@ -24,6 +25,24 @@ typedef struct test_rtsp_server_handle_ {
     test_stream_info_s vinfo;
 } test_rtsp_server_handle_s;
 
+
+static int g_start = 1;
+
+void signal_handle(int sig)   
+{  
+    printf("sig: %d\n", sig);
+
+    switch(sig) {
+    case SIGINT:
+        g_start = 0;
+        break;
+
+    default:
+        break;
+    }
+
+    return;
+}   
 
 int get_one_nalu(unsigned char *pBufIn, int nInSize, unsigned char *pNalu, int* nNaluSize)
 {
@@ -264,6 +283,8 @@ int main(int argc, char **argv)
     param.stream_src.get_max_frame_size = get_max_frame_size;
     param.stream_src.get_next_frame = get_next_frame;
 
+    signal(SIGINT, signal_handle);
+
     get_file_info(vfile, &testhdl.vinfo);
     get_file_info(afile, &testhdl.ainfo);
 
@@ -273,7 +294,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    while(1) {
+    while(g_start) {
         sleep(5);
     }
 
