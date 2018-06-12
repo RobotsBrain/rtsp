@@ -316,6 +316,8 @@ void *rtsp_server_proc(void *arg)
     unsigned int client_addr_len = sizeof(client_addr);
     rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)arg;
 
+    printf("[%s, %d] begin___\n", __FUNCTION__, __LINE__);
+
     sockfd = create_tcp_server(prshdl->ipaddr, prshdl->port);
     if(sockfd < 0) {
         return NULL;
@@ -340,6 +342,8 @@ void *rtsp_server_proc(void *arg)
 
     close(sockfd);
     sockfd = -1;
+
+    printf("[%s, %d] end___\n", __FUNCTION__, __LINE__);
 
     return NULL;
 }
@@ -380,6 +384,8 @@ int rtsp_server_stop(void** pphdl)
         return -1;
     }
 
+    printf("[%s, %d] begin___\n", __FUNCTION__, __LINE__);
+
     prshdl->start = 0;
 
     pthread_join(prshdl->rstid, NULL);
@@ -393,6 +399,8 @@ int rtsp_server_stop(void** pphdl)
 
     free(prshdl);
     prshdl = NULL;
+
+    printf("[%s, %d] end___\n", __FUNCTION__, __LINE__);
 
     return 0;
 }
