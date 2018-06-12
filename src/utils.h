@@ -27,7 +27,12 @@ int create_udp_connect(const char *host, int port, int cliport);
 int create_tcp_server(const char *host, int port);
 
 
+int parse_rtsp_url_info(char const* url, char* username, char* password,
+						char* address, int* portNum, char* path);
+
+
 int parse_domain_ip_address(const char *doname, char* ipAddr);
+
 
 #ifdef __cplusplus
 }

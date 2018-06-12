@@ -40,7 +40,6 @@ RTSP_RESPONSE *rtsp_server_describe(rtsp_server_worker_s *self, RTSP_REQUEST *re
 RTSP_RESPONSE *rtsp_server_setup(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 {
     RTSP_RESPONSE *res = NULL;
-    // rtsp_server_hdl_s* prshdl = (rtsp_server_hdl_s*)(self->pcontext);
 
     if(self->mssion.src_num > 2) {
         return NULL;

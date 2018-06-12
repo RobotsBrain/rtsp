@@ -64,7 +64,7 @@ int rtp_send_av_data(int fd, const void *buf, size_t count)
 	return ret;
 }
 
-static int rtp_build_tcp_header(char* buf, int channel, int len)
+static int rtp_build_tcp_header(unsigned char* buf, int channel, int len)
 {
 	buf[0] = 0x24;
 	buf[1] = channel;
@@ -264,18 +264,30 @@ void* rtp_video_worker_proc(void* arg)
 int rtp_build_audio_pack(rtp_stream_worker_s* paswk, unsigned int ts, unsigned char *buffer, int size)
 {
 	int offset = 0;
-	char sedbuf[1600] = {0};
+	unsigned char sedbuf[1600] = {0};
 	rtp_header_s rtp_header;
+	int transport_max_size = 1448;
+	int tcp_header_size = 0;
+
+	if(paswk->tmode == RTSP_TRANSPORT_MODE_TCP) {
+		tcp_header_size = 4;
+	}
+
+	transport_max_size -= tcp_header_size;
 
 	do {
-		int snd_len = MIN(size, 1448);
+		int snd_len = MIN(size, transport_max_size);
 
 		rtp_build_header(&rtp_header, 97, paswk->seq, ts, paswk->ssrc);
 
-		memcpy(sedbuf, &rtp_header, sizeof(rtp_header_s));
-	    memcpy(sedbuf + RTP_HEADER_SIZE, buffer + offset, snd_len);
+		if(paswk->tmode == RTSP_TRANSPORT_MODE_TCP) {
+			rtp_build_tcp_header(sedbuf, paswk->data_itl, snd_len + RTP_HEADER_SIZE);
+		}
 
-		rtp_send_av_data(paswk->sockfd, sedbuf, snd_len + RTP_HEADER_SIZE);
+		memcpy(sedbuf + tcp_header_size, &rtp_header, sizeof(rtp_header_s));
+	    memcpy(sedbuf + tcp_header_size + RTP_HEADER_SIZE, buffer + offset, snd_len);
+
+		rtp_send_av_data(paswk->sockfd, sedbuf, snd_len + tcp_header_size + RTP_HEADER_SIZE);
 
 		size -= snd_len;
 		offset += snd_len;
@@ -340,17 +352,6 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 		return -1;
 	}
 
-	if(strlen(prphdl->server_ip) <= 0) {
-		char username[32];
-		char password[32];
-		char address[64];
-		int portNum = 0;
-		char path[128];
-
-		parse_rtsp_url_info(uri, username, password, address, &portNum, path);
-		parse_domain_ip_address(address, prphdl->server_ip);
-	}
-
 	if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
 		pworker = &prphdl->vsworker;
 	} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
@@ -361,6 +362,18 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 		typedef void *(*start_routine)(void *);
 		start_routine thread_proc = NULL;
 		pthread_t* ptid = NULL;
+
+		if(strlen(prphdl->server_ip) <= 0) {
+			char username[32];
+			char password[32];
+			char address[64];
+			int portNum = 0;
+			char path[128];
+
+			if(parse_rtsp_url_info(uri, username, password, address, &portNum, path) == 0) {
+				parse_domain_ip_address(address, prphdl->server_ip);
+			}
+		}
 
 		if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
 			ptid = &prphdl->vsworker.tid;

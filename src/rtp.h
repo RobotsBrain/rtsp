@@ -28,7 +28,7 @@ typedef struct rtp_header_ {
 	unsigned int timestamp;
 
 	/* bytes 8-11 */
-	unsigned int ssrc;					/* stream number is used here. */
+	unsigned int ssrc;  /* stream number is used here. */
 } rtp_header_s;
 
 

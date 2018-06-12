@@ -18,7 +18,7 @@ THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGA
 #define SDP_STR             "application/sdp\0"
 #define RTP_UDP_STR         "RTP/AVP/UDP\0"
 #define RTP_TCP_STR         "RTP/AVP/TCP\0"
-#define INTERLEAVED_STR     "interleaved\0"
+#define INTERLEAVED_STR     "interleaved=\0"
 #define CLIENT_PORT_STR     "client_port=\0"
 #define SERVER_PORT_STR     "server_port=\0"
 #define OPTIONS_STR         "Public: DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE, OPTIONS, ANNOUNCE, RECORD\0"
@@ -146,6 +146,7 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
 
                 tok_start += strlen(INTERLEAVED_STR);
                 req->data_itl = (unsigned short)atoi(tok_start);
+                printf("%s, %d  (%s) ~~~~~~~~~~~~~~~~~~~~~~ %d\n", __FUNCTION__, __LINE__, tok_start, req->data_itl);
             }
         }
         break;
@@ -417,6 +418,7 @@ RTSP_RESPONSE *construct_rtsp_response(int code, int Session, TRANSPORT_CAST cas
     } else if(req->tmode == RTSP_TRANSPORT_MODE_TCP) {
         res->data_itl = req->data_itl;
         res->ctr_itl = req->data_itl + 1;
+printf("%s, %d ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ %d\n", __FUNCTION__, __LINE__, req->data_itl);
     }
     
     res->Content_Length = Content_Length;
