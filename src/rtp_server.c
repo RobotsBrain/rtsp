@@ -64,6 +64,16 @@ int rtp_send_av_data(int fd, const void *buf, size_t count)
 	return ret;
 }
 
+static int rtp_build_tcp_header(char* buf, int channel, int len)
+{
+	buf[0] = 0x24;
+	buf[1] = channel;
+	buf[2] = (len >> 8) & 0xFF;
+	buf[3] = len & 0xFF;
+
+	return 0;
+}
+
 int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *inbuffer, int frame_size)
 {
 	unsigned char nalu_header;
@@ -75,18 +85,31 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 	int fu_start = 1;
 	int fu_end   = 0;
 	rtp_header_s rtp_header;
+	int single_nalu_max = SINGLE_NALU_DATA_MAX;
+	int slice_nalu_max = SLICE_NALU_DATA_MAX;
+	int offset = 0;
+
+	if(pvswk->tmode == RTSP_TRANSPORT_MODE_TCP) {
+		single_nalu_max -= 4;
+		slice_nalu_max -= 4;
+		offset = 4;
+	}
 
 	rtp_build_header(&rtp_header, 96, pvswk->seq, ts, pvswk->ssrc);
 
 	//Single RTP Packet.
-    if(data_left <= SINGLE_NALU_DATA_MAX) {
+    if(data_left <= single_nalu_max) {
 	    rtp_header.seq_no = htons(pvswk->seq++);
 	    rtp_header.marker = 1;
 
-		memcpy(buffer, &rtp_header, sizeof(rtp_header_s));
-        memcpy(buffer + RTP_HEADER_SIZE, p_nalu_data, data_left);
+	    if(pvswk->tmode == RTSP_TRANSPORT_MODE_TCP) {
+	    	rtp_build_tcp_header(buffer, pvswk->data_itl, data_left + RTP_HEADER_SIZE);
+		}
 
-        rtp_send_av_data(pvswk->sockfd, buffer, data_left + RTP_HEADER_SIZE);
+		memcpy(buffer + offset, &rtp_header, sizeof(rtp_header_s));
+        memcpy(buffer + offset + RTP_HEADER_SIZE, p_nalu_data, data_left);
+
+        rtp_send_av_data(pvswk->sockfd, buffer, data_left + offset + RTP_HEADER_SIZE);
         
 		usleep(DE_TIME);
         return 0;
@@ -99,8 +122,9 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 	p_nalu_data += NALU_HEAD_SIZE;
 
 	while(data_left > 0) {
-	    int proc_size = MIN(data_left, SLICE_NALU_DATA_MAX);
-		int rtp_size = proc_size + RTP_HEADER_SIZE + FU_A_HEAD_SIZE + FU_A_INDI_SIZE;
+	    int proc_size = MIN(data_left, slice_nalu_max);
+		int rtp_size = offset + proc_size + RTP_HEADER_SIZE + FU_A_HEAD_SIZE + FU_A_INDI_SIZE;
+
 		fu_end = (proc_size == data_left);
 
 		fu_header = nalu_header & 0x1F;
@@ -111,10 +135,15 @@ int rtp_build_nalu(rtp_stream_worker_s* pvswk, unsigned int ts, unsigned char *i
 		}
 
         rtp_header.seq_no = htons(pvswk->seq++);
-		memcpy(buffer, &rtp_header, sizeof(rtp_header_s));
-		memcpy(buffer + 14, p_nalu_data, proc_size);
-		buffer[12] = fu_indic;
-		buffer[13] = fu_header;
+
+        if(pvswk->tmode == RTSP_TRANSPORT_MODE_TCP) {
+        	rtp_build_tcp_header(buffer, pvswk->data_itl, rtp_size - offset);
+		}
+
+		memcpy(buffer + offset, &rtp_header, sizeof(rtp_header_s));
+		memcpy(buffer + offset + RTP_HEADER_SIZE + 2, p_nalu_data, proc_size);
+		buffer[RTP_HEADER_SIZE + offset] = fu_indic;
+		buffer[RTP_HEADER_SIZE + offset + 1] = fu_header;
 
 		rtp_send_av_data(pvswk->sockfd, buffer, rtp_size);
 
@@ -419,6 +448,33 @@ int rtp_server_stream_data(void* phdl)
 												&identify, &vsinfo);
 		if(ret == 0 && vsinfo.size > 0) {
 			ret = rtp_build_nalu(pvswk, vsinfo.ts, vsinfo.buf, vsinfo.size);
+		}
+	}
+
+	// audio
+	{
+		rtsp_stream_identify_s identify;
+		rtp_stream_worker_s* paswk = (rtp_stream_worker_s*)&prphdl->asworker;
+
+		identify.type = RTSP_STREAM_TYPE_AUDIO;
+		identify.session_id = paswk->ssrc;
+
+		if(paswk->start != 1 && rtp_worker_init(prphdl, paswk, &identify) < 0) {
+			printf("end___, init rtp worker error!\n");
+			return -1;
+		}
+
+		memset(paswk->buf, 0, paswk->max_frame_size);
+
+		rtsp_stream_info_s vsinfo = {0};
+
+		vsinfo.buf = paswk->buf;
+		vsinfo.size = paswk->max_frame_size;
+
+		int ret = prphdl->stream_src.get_next_frame(prphdl->stream_src.priv,
+												&identify, &vsinfo);
+		if(ret == 0 && vsinfo.size > 0) {
+			ret = rtp_build_audio_pack(paswk, vsinfo.ts, vsinfo.buf, vsinfo.size);
 		}
 	}
 
