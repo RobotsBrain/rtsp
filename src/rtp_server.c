@@ -138,7 +138,7 @@ static int rtp_worker_init(rtp_server_hdl_s* prphdl, rtp_stream_worker_s* pswk, 
 		pswk->max_frame_size = 2048;
 	}
 
-	if(pswk->sockfd <= 0) {
+	if(pswk->tmode == RTSP_TRANSPORT_MODE_UDP) {
 		pswk->sockfd = create_udp_connect(prphdl->server_ip, pswk->server_port,
 											pswk->client_port);
 		if(pswk->sockfd < 0) {
@@ -322,17 +322,21 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 		parse_domain_ip_address(address, prphdl->server_ip);
 	}
 
+	if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
+		pworker = &prphdl->vsworker;
+	} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
+		pworker = &prphdl->asworker;
+	}
+
 	if(pparam->tmode == RTSP_TRANSPORT_MODE_UDP) {
 		typedef void *(*start_routine)(void *);
 		start_routine thread_proc = NULL;
 		pthread_t* ptid = NULL;
 
 		if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
-			pworker = &prphdl->vsworker;
 			ptid = &prphdl->vsworker.tid;
 			thread_proc = rtp_video_worker_proc;
 		} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
-			pworker = &prphdl->asworker;
 			ptid = &prphdl->asworker.tid;
 			thread_proc = rtp_audio_worker_proc;
 		}
@@ -345,12 +349,6 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 			printf("ret: %d, create thread fail!\n", ret);
 		}
 	} else if (pparam->tmode == RTSP_TRANSPORT_MODE_TCP) {
-		if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
-			pworker = &prphdl->vsworker;
-		} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
-			pworker = &prphdl->asworker;
-		}
-
 		pworker->sockfd = pparam->sockfd;
 		pworker->data_itl = pparam->data_itl;
 		pworker->ctr_itl = pparam->ctr_itl;
