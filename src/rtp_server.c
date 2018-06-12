@@ -26,17 +26,18 @@
 
 
 typedef struct rtp_stream_worker_ {
-	char 			start;
-	int 			sockfd;
-	int 			server_port;
-	int 			client_port;
-	unsigned short  data_itl;
-    unsigned short  ctr_itl; 
-	unsigned short 	seq;
-	int 			ssrc;
-	pthread_t 		tid;
-	unsigned char* 	buf;
-	int 			max_frame_size;
+	char 					start;
+	int 					sockfd;
+	int 					server_port;
+	int 					client_port;
+	unsigned short  		data_itl;
+    unsigned short  		ctr_itl; 
+	unsigned short 			seq;
+	int 					ssrc;
+	pthread_t 				tid;
+	unsigned char* 			buf;
+	int 					max_frame_size;
+	RTSP_TRANSPORT_MODE_E   tmode;
 } rtp_stream_worker_s;
 
 
@@ -339,17 +340,19 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 			printf("ret: %d, create thread fail!\n", ret);
 		}
 	} else if (pparam->tmode == RTSP_TRANSPORT_MODE_TCP) {
+		rtp_stream_worker_s* pworker = NULL;
+
 		if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
-			prphdl->vsworker.ssrc = random32(0);
-			prphdl->vsworker.sockfd = pparam->sockfd;
-			prphdl->vsworker.data_itl = pparam->data_itl;
-			prphdl->vsworker.ctr_itl = pparam->ctr_itl;
+			pworker = &prphdl->vsworker;
 		} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
-			prphdl->asworker.ssrc = random32(0);
-			prphdl->asworker.sockfd = pparam->sockfd;
-			prphdl->asworker.data_itl = pparam->data_itl;
-			prphdl->asworker.ctr_itl = pparam->ctr_itl;
+			pworker = &prphdl->asworker;
 		}
+
+		pworker->ssrc = random32(0);
+		pworker->tmode = pparam->tmode;
+		pworker->sockfd = pparam->sockfd;
+		pworker->data_itl = pparam->data_itl;
+		pworker->ctr_itl = pparam->ctr_itl;
 
 		printf("set stream sockfd(%d)\n", pparam->sockfd);
 
@@ -398,7 +401,7 @@ int rtp_server_stream_data(void* phdl)
 
 		if(pvswk->start != 1 && rtp_worker_init(prphdl, pvswk, &identify) < 0) {
 			printf("end___, init rtp worker error!\n");
-			return NULL;
+			return -1;
 		}
 
 		memset(pvswk->buf, 0, pvswk->max_frame_size);
