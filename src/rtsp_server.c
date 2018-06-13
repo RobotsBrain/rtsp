@@ -137,7 +137,11 @@ RTSP_RESPONSE *rtsp_server_pause(rtsp_server_worker_s *self, RTSP_REQUEST *req)
 
 RTSP_RESPONSE *rtsp_server_teardown(rtsp_server_worker_s* self, RTSP_REQUEST *req)
 {
-    return NULL;
+    if (1/* TODO: Check if file exists */) {
+        return rtsp_teardown_res(req);
+    } else {
+        return rtsp_notfound(req);
+    }
 }
 
 int rtsp_deal_with_data(rtsp_server_hdl_s* prshdl, rtsp_server_worker_s* self,
@@ -178,6 +182,8 @@ int rtsp_deal_with_data(rtsp_server_hdl_s* prshdl, rtsp_server_worker_s* self,
 
     case TEARDOWN:
         res = rtsp_server_teardown(self, req);
+        self->play = 0;
+        self->start = 0;   // stop server
         break;
 
     default:
@@ -185,12 +191,16 @@ int rtsp_deal_with_data(rtsp_server_hdl_s* prshdl, rtsp_server_worker_s* self,
         break;
     }
 
-    if(res) {
+    if(res != NULL) {
         int len = rtsp_pack_response(res, buf, REQ_BUFFER);
         if(len > 0) {
             fprintf(stderr, "\n########################## RESPONSE\n%s\n", buf);
-            send(sockfd, buf, len, 0);
+            int ret = send(sockfd, buf, len, 0);
+            if(ret != len) {
+                printf("send data error!\n");
+            }
         }
+
         rtsp_free_response(&res);
     }
 
@@ -212,6 +222,8 @@ void *rtsp_server_worker_proc(void *arg)
     struct timeval tv;
     char buf[REQ_BUFFER] = {0};
 
+    printf("begin___, (%p)\n", self);
+
     self->start = 1;
 
     while(self->start) {
@@ -231,7 +243,7 @@ void *rtsp_server_worker_proc(void *arg)
             continue;
         }
 
-        if (FD_ISSET(sockfd, &rfds)) {
+        if(FD_ISSET(sockfd, &rfds)) {
             bzero(buf, REQ_BUFFER);
 
             len = recv(sockfd, buf, REQ_BUFFER, 0);
@@ -241,13 +253,12 @@ void *rtsp_server_worker_proc(void *arg)
             } else if (len < 0) {
                 printf("errno: %d, msg: %s\n", errno, strerror(errno));
             } else {
-                printf("exit\n");
+                printf("recv 0 byte data, exit rtsp server!\n");
                 break;
             }
         }
 
         if (FD_ISSET(sockfd, &wfds)) {
-            // rtp over tcp, send data
             if(self->tmode == RTSP_TRANSPORT_MODE_TCP && self->play == 1) {
                 rtp_server_stream_data(self->prtphdl);
             }
@@ -261,6 +272,8 @@ void *rtsp_server_worker_proc(void *arg)
 
     close(self->sockfd);
     memset(self, 0, sizeof(rtsp_server_worker_s));
+
+    printf("end___, (%p)\n", self);
 
     return NULL;
 }
@@ -318,7 +331,7 @@ void *rtsp_server_proc(void *arg)
 
     printf("[%s, %d] begin___\n", __FUNCTION__, __LINE__);
 
-    sockfd = create_tcp_server(prshdl->ipaddr, prshdl->port);
+    sockfd = create_tcp_server(prshdl->port);
     if(sockfd < 0) {
         return NULL;
     }
@@ -329,7 +342,12 @@ void *rtsp_server_proc(void *arg)
         memset(&client_addr, 0, sizeof(struct sockaddr_storage));
 
         cli_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_len);
-        if (cli_sockfd == -1) {
+        if(cli_sockfd == -1) {
+            if(errno == EAGAIN || errno == EINTR) {
+                usleep(1000);
+                continue;
+            }
+
             break;
         }
 
@@ -361,7 +379,7 @@ int rtsp_server_start(void** pphdl, rtsp_server_param_s* pparam)
     memset(prshdl, 0, sizeof(rtsp_server_hdl_s));
 
     prshdl->port = pparam->port;
-    strcpy(prshdl->ipaddr, pparam->ipaddr);
+    // strcpy(prshdl->ipaddr, pparam->ipaddr);
     memcpy(&prshdl->stream_src, &pparam->stream_src, sizeof(rtsp_stream_source_s));
 
     ret = pthread_create(&prshdl->rstid, NULL, rtsp_server_proc, prshdl);

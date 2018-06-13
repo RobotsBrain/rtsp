@@ -160,7 +160,7 @@ int create_udp_connect(const char *host, int server_port, int cliport)
     return fd;
 }
 
-int create_tcp_server(const char *host, int port)
+int create_tcp_server(int port)
 {
     int ret = -1;
     int sockfd = -1;
@@ -175,7 +175,10 @@ int create_tcp_server(const char *host, int port)
         perror("cannot open socket ");
         return -1;
     }
- 
+
+    struct timeval timeout = {3, 0};
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(struct timeval));
+
     servAddr.sin_family = AF_INET;
     servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servAddr.sin_port = htons(port);

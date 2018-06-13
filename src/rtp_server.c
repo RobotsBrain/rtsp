@@ -44,7 +44,9 @@ typedef struct rtp_stream_worker_ {
 typedef struct rtp_handle_ {
 	char 					server_ip[32];
 	rtsp_stream_source_s	stream_src;
+	char 					aparamset;
 	rtp_stream_worker_s 	asworker;
+	char 					vparamset;
 	rtp_stream_worker_s		vsworker;
 } rtp_server_hdl_s;
 
@@ -59,6 +61,8 @@ int rtp_send_av_data(int fd, const void *buf, size_t count)
 	if(size == count) {
 		// printf("sock(%d) send %d bytes data!\n", fd, size);
 		ret = 0;
+	} else {
+		// printf("(%d) send %lu bytes data error, return val(%lu)!\n", fd, count, size);
 	}
 
 	return ret;
@@ -277,10 +281,10 @@ void* rtp_video_worker_proc(void* arg)
 int rtp_build_audio_pack(rtp_stream_worker_s* paswk, unsigned int ts, unsigned char *buffer, int size)
 {
 	int offset = 0;
+	int tcp_header_size = 0;
+	int transport_max_size = 1448;
 	unsigned char sedbuf[1600] = {0};
 	rtp_header_s rtp_header;
-	int transport_max_size = 1448;
-	int tcp_header_size = 0;
 
 	if(paswk->tmode == RTSP_TRANSPORT_MODE_TCP) {
 		tcp_header_size = 4;
@@ -349,8 +353,10 @@ int rtp_server_start_streaming(void* phdl, unsigned char* uri, rtp_server_stream
 
 	if(pparam->type == RTSP_STREAM_TYPE_VIDEO) {
 		pworker = &prphdl->vsworker;
+		prphdl->vparamset = 1;
 	} else if (pparam->type == RTSP_STREAM_TYPE_AUDIO) {
 		pworker = &prphdl->asworker;
+		prphdl->aparamset = 1;
 	}
 
 	if(pparam->tmode == RTSP_TRANSPORT_MODE_UDP) {
@@ -440,30 +446,28 @@ int rtp_server_stream_data(void* phdl)
 		return -1;
 	}
 
-	// video
-	{
+	if(prphdl->vparamset == 1) {
 		rtp_stream_worker_s* pvswk = (rtp_stream_worker_s*)&prphdl->vsworker;
 
 		identify.type = RTSP_STREAM_TYPE_VIDEO;
 		identify.session_id = pvswk->ssrc;
 
 		if(pvswk->start != 1 && rtp_worker_init(prphdl, pvswk, &identify) < 0) {
-			printf("end___, init rtp worker error!\n");
+			printf("end___, init video rtp worker error!\n");
 			return -1;
 		}
 
 		rtp_server_pack_send_av_stream(prphdl, pvswk, &identify);
 	}
 
-	// audio
-	{
+	if(prphdl->aparamset == 1) {
 		rtp_stream_worker_s* paswk = (rtp_stream_worker_s*)&prphdl->asworker;
 
 		identify.type = RTSP_STREAM_TYPE_AUDIO;
 		identify.session_id = paswk->ssrc;
 
 		if(paswk->start != 1 && rtp_worker_init(prphdl, paswk, &identify) < 0) {
-			printf("end___, init rtp worker error!\n");
+			printf("end___, init audio rtp worker error!\n");
 			return -1;
 		}
 

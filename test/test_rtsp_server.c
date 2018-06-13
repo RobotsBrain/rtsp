@@ -127,7 +127,7 @@ int get_sdp(void* thiz, rtsp_stream_identify_s* pidentify, char* buf, int* size)
         strcpy(buf, "m=video 0 RTP/AVP 96\r\n"
                     "c=IN IP4 0.0.0.0\r\n"
                     "b=AS:96\r\n"
-                    "a=rtpmap:96 H264/%90000\r\n"
+                    "a=rtpmap:96 H264/90000\r\n"
                     "a=cliprect:0,0,640,360\r\n"
                     "a=framesize:96 640-360\r\n"
                     "a=fmtp:96 packetization-mode=1;profile-level-id=42801E\r\n"
@@ -238,14 +238,13 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     unsigned short port = 8554;
-    char ipaddr[32] = {0};
     char vfile[128] = {0};
     char afile[128] = {0};
     void* phdl = NULL;
     rtsp_server_param_s param;
     test_rtsp_server_handle_s testhdl;
 
-    while((ret = getopt(argc, argv, "?p:a:v:i:h")) != -1) {
+    while((ret = getopt(argc, argv, "?p:a:v:h")) != -1) {
         switch(ret) {
         case 'p':
             port = atoi(optarg);
@@ -259,10 +258,6 @@ int main(int argc, char **argv)
             strcpy(vfile, optarg);
             break;
 
-        case 'i':
-            strcpy(ipaddr, optarg);
-            break;
-
         case 'h':
             break;
 
@@ -274,7 +269,6 @@ int main(int argc, char **argv)
     memset(&param, 0, sizeof(rtsp_server_param_s));
     memset(&testhdl, 0, sizeof(test_rtsp_server_handle_s));
 
-    strcpy(param.ipaddr, ipaddr);
     param.port = port;
     param.stream_src.priv = &testhdl;
     param.stream_src.start = start;
@@ -309,4 +303,4 @@ int main(int argc, char **argv)
 
 // ffplay rtsp://127.0.0.1:8554 -v debug
 // ffplay -rtsp_transport tcp rtsp://127.0.0.1:8554/live -v trace
-// ./cmake-build/out/test/test_rtsp_server -i 127.0.0.1 -v resource/liqin.h264 -a resource/liqin.g711u
+// ./cmake-build/out/test/test_rtsp_server -v resource/liqin.h264 -a resource/liqin.g711u

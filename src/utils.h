@@ -24,7 +24,7 @@ unsigned int random32(int type);
 int create_udp_connect(const char *host, int port, int cliport);
 
 
-int create_tcp_server(const char *host, int port);
+int create_tcp_server(int port);
 
 
 int parse_rtsp_url_info(char const* url, char* username, char* password,

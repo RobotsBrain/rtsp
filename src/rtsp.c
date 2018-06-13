@@ -108,10 +108,10 @@ static int detect_attr_req(RTSP_REQUEST *req, char *tok_start, int text_size)
 
     case TRANSPORT_STR:
         /* The only acceptable transport is RTP */
-        if(strnstr(tok_start, RTP_UDP_STR, attr_len) != 0) {
+        if(strnstr(tok_start, CLIENT_PORT_STR, attr_len) != 0) {
             req->tmode = RTSP_TRANSPORT_MODE_UDP;
         } else {
-            if(strnstr(tok_start, RTP_TCP_STR, attr_len) != 0) {
+            if(strnstr(tok_start, INTERLEAVED_STR, attr_len) != 0) {
                 req->tmode = RTSP_TRANSPORT_MODE_TCP;
             } else {
                 return 0;

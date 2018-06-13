@@ -47,7 +47,7 @@ typedef struct rtsp_server_worker_ {
 typedef struct rtsp_server_hdl_ {
     char                    start;
     unsigned short          port;
-    char 					ipaddr[32];
+    // char 					ipaddr[32];
     pthread_t               rstid;
     rtsp_stream_source_s    stream_src;
     rtsp_server_worker_s    workers[MAX_RTSP_WORKERS];
