@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
+#include <stdint.h>
 
 #include "rtsp_server.h"
 
@@ -43,6 +44,17 @@ void signal_handle(int sig)
 
     return;
 }   
+
+int64_t get_current_time_ms()
+{
+    int64_t ts = 0;
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    ts = (int64_t)tv.tv_sec*1000 + tv.tv_usec/1000;
+
+    return ts;
+}
 
 int get_one_nalu(unsigned char *pBufIn, int nInSize, unsigned char *pNalu, int* nNaluSize)
 {
@@ -177,7 +189,6 @@ int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, rtsp_stream_in
         memcpy(psvif->buf, sinfo->buf + sinfo->offset, psvif->size);
 
         psvif->ts = sinfo->ts;
-
         sinfo->offset += psvif->size;
     } else if(pidentify->type == RTSP_STREAM_TYPE_VIDEO) {
         test_stream_info_s* sinfo = &pthdl->vinfo;
@@ -195,7 +206,6 @@ int get_next_frame(void* thiz, rtsp_stream_identify_s* pidentify, rtsp_stream_in
         }
 
         psvif->ts = sinfo->ts;
-
         sinfo->offset += psvif->size;
     }
 
