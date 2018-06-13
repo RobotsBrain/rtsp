@@ -252,6 +252,9 @@ void *rtsp_server_worker_proc(void *arg)
                 rtsp_deal_with_data(prshdl, self, sockfd, buf, len); 
             } else if (len < 0) {
                 printf("errno: %d, msg: %s\n", errno, strerror(errno));
+                if(errno == ECONNRESET) {
+                    break;
+                }
             } else {
                 printf("recv 0 byte data, exit rtsp server!\n");
                 break;
